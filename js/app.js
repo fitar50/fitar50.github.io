@@ -223,6 +223,14 @@ document.addEventListener('click', e => {
         body.classList.toggle('open');
         const card = el.closest('.order-card');
         if (card) card.classList.toggle('open');
+        // Persist open cards immediately so the 10 s refresh and page reloads
+        // don't collapse cards the manager just manually opened.
+        try {
+          const openNames = [];
+          document.querySelectorAll('.order-card.open .oc-name')
+            .forEach(n => openNames.push(n.textContent.trim()));
+          localStorage.setItem('mgrOpenCards', JSON.stringify(openNames));
+        } catch (_e) {}
       }
       break;
     }
