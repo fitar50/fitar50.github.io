@@ -487,7 +487,6 @@ async function submitOrder() {
     S.orderedBy = null;
     S.isDirty   = false;
     resetBtn(btn);
-    saveSubmitTime(S.currentName);
     renderSubmittedScreen();
     showToast('تم حفظ الطلب ✓');
   } catch (e) {
@@ -545,11 +544,6 @@ function lookupClosedOrder() {
 window.addEventListener('beforeunload', e => {
   if (S.isDirty) { e.preventDefault(); e.returnValue = ''; }
 });
-
-// Register service worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-}
 
 window.addEventListener('load', () => {
   // Modal backdrop dismissals
