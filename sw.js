@@ -1,75 +1,33 @@
-// sw.js
-const CACHE_NAME = 'fattar-v9'; // bumped: added missing renderNotOpenScreen + loadSubmitTime
-
-const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './css/style.css',
-  './js/config.js',
-  './js/api.js',
-  './js/app.js',
-  './js/manager.js',
-  './js/screens.js',
-  './js/utils.js',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-];
+// sw.js — SAFE MODE v10: clears all old caches, zero JS caching
+const CACHE_NAME = 'fattar-v10';
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  // Take over immediately — don't wait for old SW to die
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      ))
+      .then(keys => {
+        console.log('[SW] Clearing caches:', keys);
+        return Promise.all(keys.map(key => caches.delete(key)));
+      })
       .then(() => self.clients.claim())
   );
 });
 
+// Everything goes straight to the network — no caching at all
 self.addEventListener('fetch', event => {
-  const url = event.request.url;
-
-  // Railway API calls → network-only with 15s timeout
-  if (url.includes('fitar-production.up.railway.app')) {
-    event.respondWith(
-      (() => {
-        const controller = new AbortController();
-        const timeoutId  = setTimeout(() => controller.abort(), 15000);
-        return fetch(event.request, { signal: controller.signal })
-          .then(r => { clearTimeout(timeoutId); return r; })
-          .catch(() => {
-            clearTimeout(timeoutId);
-            return new Response(
-              JSON.stringify({ success: false, error: 'أنت offline — تأكد من الإنترنت' }),
-              { status: 503, headers: { 'Content-Type': 'application/json' } }
-            );
-          });
-      })()
-    );
-    return;
-  }
-
-  // Static assets → cache-first, revalidate in background
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const networkFetch = fetch(event.request).then(response => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
+    fetch(event.request).catch(() => {
+      if (event.request.mode === 'navigate') {
+        return new Response('<h1>لا يوجد إنترنت</h1>', { headers: { 'Content-Type': 'text/html' } });
+      }
+      return new Response(JSON.stringify({ success: false, error: 'offline' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
       });
-      return cached || networkFetch;
-    }).catch(() => caches.match('./index.html'))
+    })
   );
 });
