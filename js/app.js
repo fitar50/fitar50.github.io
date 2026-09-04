@@ -268,7 +268,7 @@ document.getElementById('mgrCodeInput').addEventListener('keydown', function(e) 
 // Note input listener — delegated on the menu container
 document.addEventListener('input', e => {
   if (!e.target.matches('.note-input')) return;
-  const id   = parseInt(e.target.dataset.itemId, 10);
+  const id   = parseInt(e.target.dataset.id, 10);
   const item = S.menuFlat[id];
   if (!item) return;
   const val = e.target.value;  // keep spaces while typing; trim on submit
