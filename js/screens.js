@@ -143,7 +143,12 @@ function renderSubmittedScreen() {
 
   const items = Object.entries(S.currentQty)
     .filter(([, q]) => q > 0)
-    .map(([name, qty]) => ({ name, qty, price: findPrice(name) }));
+    .map(([name, qty]) => {
+      const obj  = { name, qty, price: findPrice(name) };
+      const note = (S.currentNotes[name] || '').trim();
+      if (note) obj.note = note;
+      return obj;
+    });
   const foodTotal = items.reduce((s, i) => s + i.price * i.qty, 0);
   // Bug #8: use server-side count (kept fresh by poll) when available;
   // S.orders is only fetched once at init so it can lag behind reality
@@ -157,7 +162,10 @@ function renderSubmittedScreen() {
 
   document.getElementById('subList').innerHTML = items.map(i => `
     <div class="summary-row">
-      <span><span class="qty-tag">×${i.qty}</span>${h(i.name)}</span>
+      <span>
+        <span class="qty-tag">×${i.qty}</span>${h(i.name)}
+        ${i.note ? `<span class="summary-note">📝 ${h(i.note)}</span>` : ''}
+      </span>
       <span>${i.price * i.qty} جنيه</span>
     </div>`).join('');
 
@@ -206,7 +214,10 @@ function renderClosedOrder(name, items) {
 
   document.getElementById('closedList').innerHTML = items.map(i => `
     <div class="summary-row">
-      <span><span class="qty-tag">×${i.qty}</span>${h(i.name)}</span>
+      <span>
+        <span class="qty-tag">×${i.qty}</span>${h(i.name)}
+        ${i.note ? `<span class="summary-note">📝 ${h(i.note)}</span>` : ''}
+      </span>
       <span>${i.price * i.qty} جنيه</span>
     </div>`).join('');
 
