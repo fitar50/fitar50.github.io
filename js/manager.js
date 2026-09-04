@@ -61,7 +61,7 @@ function renderManagerDashboard() {
       g.instances.forEach(inst => {
         const sub = g.price * inst.qty;
         food += sub;
-        const qtyLabel = inst.qty > 1 ? ` × ${inst.qty}` : '';
+        const qtyLabel = inst.qty > 0 ? ` × ${inst.qty}` : '';
         rowsHtml += `<div class="ts-row"><span>${h(itemName)}${qtyLabel}</span><span>${sub} جنيه</span></div>`;
         if (inst.note) {
           rowsHtml += `<div class="ts-item-note">📝 ${h(inst.note)}</div>`;
@@ -247,7 +247,7 @@ function buildRestaurantText() {
   const lines = [];
   Object.entries(grouped).forEach(([name, instances]) => {
     instances.forEach(inst => {
-      const qtyLabel = inst.qty > 1 ? ` × ${inst.qty}` : '';
+      const qtyLabel = inst.qty > 0 ? ` × ${inst.qty}` : '';
       const notePart = inst.note ? ` (${inst.note})` : '';
       lines.push(`${name}${qtyLabel}${notePart}`);
     });
