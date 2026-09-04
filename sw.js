@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_NAME = 'fattar-v7'; // bumped: migrated from GAS to Railway
+const CACHE_NAME = 'fattar-v9'; // bumped: added missing renderNotOpenScreen + loadSubmitTime
 
 const STATIC_ASSETS = [
   './',

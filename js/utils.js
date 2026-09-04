@@ -114,6 +114,21 @@ function resetBtn(btn) {
 }
 
 // ================================================================
+// SUBMIT TIME — saved per user in localStorage so the submitted
+// screen can display when the order was placed.
+// ================================================================
+function saveSubmitTime(name) {
+  try {
+    const t = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+    localStorage.setItem('fattar_time_' + name, t);
+  } catch(e) {}
+}
+
+function loadSubmitTime(name) {
+  try { return localStorage.getItem('fattar_time_' + name) || null; } catch(e) { return null; }
+}
+
+// ================================================================
 // CUSTOM CONFIRM SHEET
 // Replaces browser confirm() for all DB-hitting operations.
 // showConfirm(message, onConfirm) — shows a bottom-sheet modal.

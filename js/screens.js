@@ -217,6 +217,11 @@ function renderManagerLogin() {
   showScreen('screen-mgr-login');
 }
 
+/* ---------- NOT OPEN SCREEN ---------- */
+function renderNotOpenScreen() {
+  showScreen('screen-not-open');
+}
+
 /* ---------- ERROR / RETRY ---------- */
 function renderErrorScreen() {
   showScreen('screen-error');
