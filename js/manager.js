@@ -33,40 +33,39 @@ function renderManagerDashboard() {
   document.getElementById('sFood').textContent   = foodGrand;
   document.getElementById('sTotal').textContent  = totalGrand.toFixed(0);
 
-  // Total summary — show each person's item as its own line (with notes), not aggregated
+  // Total summary
+  // FIX: group by (name + note) so the same item with different notes stays
+  // on separate rows, but the same item+note from multiple people is merged
+  // (quantities summed). Before: always grouped by name → lost note context.
   const ts = document.getElementById('totalSummary');
   if (!orders.length) {
     ts.innerHTML = '<div class="ts-row" style="color:var(--grey);">لا يوجد طلبات حتى الآن</div>';
   } else {
-    // Collect all item-instances across all orders, grouped by item name
-    const grouped = {}; // { itemName: [{ qty, note, price }] }
+    const grouped = {}; // key: "name\x00note"
     orders.forEach(o => {
       o.items.forEach(i => {
-        if (!grouped[i.name]) grouped[i.name] = { price: i.price, instances: [] };
-        grouped[i.name].instances.push({ qty: i.qty, note: i.note || '' });
+        const note = i.note || '';
+        const key  = i.name + '\x00' + note;
+        if (!grouped[key]) grouped[key] = { name: i.name, note, price: i.price, qty: 0 };
+        grouped[key].qty += i.qty;
       });
     });
 
-    // Sort by total quantity descending
-    const sortedNames = Object.keys(grouped).sort((a, b) => {
-      const qa = grouped[a].instances.reduce((s, x) => s + x.qty, 0);
-      const qb = grouped[b].instances.reduce((s, x) => s + x.qty, 0);
-      return qb - qa;
+    // Sort by qty descending, then alphabetically
+    const sortedKeys = Object.keys(grouped).sort((a, b) => {
+      const diff = grouped[b].qty - grouped[a].qty;
+      return diff !== 0 ? diff : grouped[a].name.localeCompare(grouped[b].name);
     });
 
     let food = 0;
     let rowsHtml = '';
-    sortedNames.forEach(itemName => {
-      const g = grouped[itemName];
-      g.instances.forEach(inst => {
-        const sub = g.price * inst.qty;
-        food += sub;
-        const qtyLabel = inst.qty > 0 ? ` × ${inst.qty}` : '';
-        rowsHtml += `<div class="ts-row"><span>${h(itemName)}${qtyLabel}</span><span>${sub} جنيه</span></div>`;
-        if (inst.note) {
-          rowsHtml += `<div class="ts-item-note">📝 ${h(inst.note)}</div>`;
-        }
-      });
+    sortedKeys.forEach(key => {
+      const g   = grouped[key];
+      const sub = g.price * g.qty;
+      food += sub;
+      // Items with a note shown as "name — note × qty" so they read as distinct
+      const label = g.note ? `${h(g.name)} — ${h(g.note)}` : h(g.name);
+      rowsHtml += `<div class="ts-row"><span>${label} × ${g.qty}</span><span>${sub} جنيه</span></div>`;
     });
 
     ts.innerHTML = `
@@ -83,9 +82,24 @@ function renderManagerDashboard() {
   }
 
   // Per-person cards
+  // FIX: capture which cards are currently expanded (DOM state + localStorage)
+  // BEFORE clearing the list, then restore after rebuild so cards don't collapse
+  // on every 10 s refresh or on page reload.
   const list = document.getElementById('ordersList');
+
+  const openNames = new Set();
+  list.querySelectorAll('.order-card.open .oc-name').forEach(el => {
+    openNames.add(el.textContent.trim());
+  });
+  // Also load any names saved to localStorage (survives page reload)
+  try {
+    const saved = JSON.parse(localStorage.getItem('mgrOpenCards') || '[]');
+    saved.forEach(n => openNames.add(n));
+  } catch (e) {}
+
   if (!orders.length) {
     list.innerHTML = '<div class="empty"><div class="e-icon">🍽️</div><p>لا يوجد طلبات بعد</p></div>';
+    try { localStorage.removeItem('mgrOpenCards'); } catch (e) {}
   } else {
     list.innerHTML = '';
     orders.forEach(order => {
@@ -94,7 +108,7 @@ function renderManagerDashboard() {
       const orderedByTag = (order.orderedBy && order.orderedBy !== order.name)
         ? `<div class="oc-ordered-by">بواسطة: ${h(order.orderedBy)}</div>` : '';
 
-      // Build items HTML with notes
+      // Build items HTML — note row shown below each item that has one
       const itemsHtml = order.items.map(i => {
         const noteRow = i.note
           ? `<div class="oc-item-note">📝 ${h(i.note)}</div>`
@@ -106,8 +120,9 @@ function renderManagerDashboard() {
           </div>${noteRow}`;
       }).join('');
 
-      const card = document.createElement('div');
-      card.className = 'order-card';
+      const isOpen = openNames.has(order.name);
+      const card   = document.createElement('div');
+      card.className = 'order-card' + (isOpen ? ' open' : '');
       card.innerHTML = `
         <div class="oc-header" data-action="toggleOC">
           <div class="oc-header-info">
@@ -121,7 +136,7 @@ function renderManagerDashboard() {
             <span class="cat-chevron">▼</span>
           </div>
         </div>
-        <div class="oc-body">
+        <div class="oc-body${isOpen ? ' open' : ''}">
           ${itemsHtml}
           <div class="oc-breakdown">
             <div class="oc-brow"><span>طعام</span><span>${food} جنيه</span></div>
@@ -131,6 +146,9 @@ function renderManagerDashboard() {
         </div>`;
       list.appendChild(card);
     });
+
+    // Persist the open set so next render / page reload can restore it
+    try { localStorage.setItem('mgrOpenCards', JSON.stringify([...openNames])); } catch (e) {}
   }
 
   // Manager person selector (for adding orders)
@@ -233,24 +251,23 @@ async function mgrAddNewName() {
   }
 }
 
-// Copy-to-clipboard text for the restaurant — includes notes
+// Copy-to-clipboard text for the restaurant
+// FIX: group by (name + note) — same name with different notes → separate lines;
+// same name + same note from multiple people → merged (qty summed).
 function buildRestaurantText() {
-  // Collect instances grouped by item
-  const grouped = {};
+  const grouped = {}; // key: "name\x00note"
   S.orders.forEach(o => {
     o.items.forEach(i => {
-      if (!grouped[i.name]) grouped[i.name] = [];
-      grouped[i.name].push({ qty: i.qty, note: i.note || '' });
+      const note = i.note || '';
+      const key  = i.name + '\x00' + note;
+      if (!grouped[key]) grouped[key] = { name: i.name, note, qty: 0 };
+      grouped[key].qty += i.qty;
     });
   });
 
-  const lines = [];
-  Object.entries(grouped).forEach(([name, instances]) => {
-    instances.forEach(inst => {
-      const qtyLabel = inst.qty > 0 ? ` × ${inst.qty}` : '';
-      const notePart = inst.note ? ` (${inst.note})` : '';
-      lines.push(`${name}${qtyLabel}${notePart}`);
-    });
+  const lines = Object.values(grouped).map(g => {
+    const notePart = g.note ? ` (${g.note})` : '';
+    return `${g.name}${notePart} × ${g.qty}`;
   });
 
   const totalItems = S.orders.reduce((t, o) => t + o.items.reduce((s, i) => s + i.qty, 0), 0);
