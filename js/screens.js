@@ -68,19 +68,31 @@ function renderOrderScreen(name) {
 
     let itemsHtml = '';
     items.forEach(item => {
-      const flatItem = S.menuFlat.find(f => f.name === item.name);
-      const id  = flatItem ? flatItem.id : 0;
-      const qty = S.currentQty[item.name] || 0;
+      const flatItem     = S.menuFlat.find(f => f.name === item.name);
+      const id           = flatItem ? flatItem.id : 0;
+      const qty          = S.currentQty[item.name] || 0;
+      const existingNote = S.currentNotes[item.name] || '';
+      // Each item is wrapped in .item-wrap so the note button and input
+      // can live below the item row without breaking the border separators.
+      // The note button is hidden until qty > 0 (shown by chgQty in app.js).
+      // The note input is hidden until the user taps the note button.
       itemsHtml += `
-        <div class="item-row">
-          <div class="item-info">
-            <div class="item-name">${h(item.name)}</div>
-            <div class="item-price">${item.price} جنيه</div>
+        <div class="item-wrap">
+          <div class="item-row">
+            <div class="item-info">
+              <div class="item-name">${h(item.name)}</div>
+              <div class="item-price">${item.price} جنيه</div>
+            </div>
+            <div class="qty">
+              <button class="qty-btn minus" data-action="qty" data-id="${id}" data-delta="-1">−</button>
+              <div class="qty-num ${qty > 0 ? 'nonzero' : ''}" id="qn-${id}">${qty}</div>
+              <button class="qty-btn plus"  data-action="qty" data-id="${id}" data-delta="+1">+</button>
+            </div>
           </div>
-          <div class="qty">
-            <button class="qty-btn minus" data-action="qty" data-id="${id}" data-delta="-1">−</button>
-            <div class="qty-num ${qty > 0 ? 'nonzero' : ''}" id="qn-${id}">${qty}</div>
-            <button class="qty-btn plus"  data-action="qty" data-id="${id}" data-delta="+1">+</button>
+          <button class="note-btn${existingNote ? ' has-note' : ''}" id="nbtn-${id}" data-action="toggleNote" data-id="${id}"${qty > 0 ? '' : ' style="display:none"'}>📝 ملاحظة</button>
+          <div class="note-input-wrap" id="nwrap-${id}"${existingNote ? ' style="display:block"' : ''}>
+            <input class="note-input" id="ninput-${id}" data-id="${id}" type="text"
+              placeholder="مثلاً: بدون طماطم" maxlength="200" value="${h(existingNote)}">
           </div>
         </div>`;
     });
