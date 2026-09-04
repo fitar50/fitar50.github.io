@@ -19,8 +19,7 @@ function fillNameDropdown(selId, skipNew = false) {
 }
 
 function renderNameScreen() {
-  fillNameDropdown('nameSelect');
-  document.getElementById('newNameWrap').style.display  = 'none';
+  fillNameDropdown('nameSelect', true);
   document.getElementById('editNameBtn').style.display  = 'none';
   document.getElementById('editNameWrap').style.display = 'none';  // Bug #6: reset inline edit
   document.getElementById('nameSelect').value = '';

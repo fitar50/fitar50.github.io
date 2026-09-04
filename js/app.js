@@ -487,6 +487,7 @@ async function submitOrder() {
     S.orderedBy = null;
     S.isDirty   = false;
     resetBtn(btn);
+    saveSubmitTime(S.currentName);
     renderSubmittedScreen();
     showToast('تم حفظ الطلب ✓');
   } catch (e) {
