@@ -354,6 +354,13 @@ select:focus, input:focus { border-color: var(--orange); }
   font-size: 16px; font-weight: 800; color: var(--orange);
 }
 .trow .note { font-size: 11px; color: var(--grey); margin-top: 2px; }
+/* Note tag inside a summary-row (submitted + closed screens) */
+.summary-note {
+  display: block;
+  font-size: 11px;
+  color: var(--grey);
+  margin-top: 3px;
+}
 .trow .note-alert {
   font-size: 12px; color: var(--orange-dark); font-weight: 700;
   background: #fff; padding: 6px 10px; border-radius: 8px;
