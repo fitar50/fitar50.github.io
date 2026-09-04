@@ -1,11 +1,5 @@
-// ================================================================
-// SERVICE WORKER — فطار الشغل
-// Strategy:
-//   Static assets  → cache-first (serve instantly, update in bg)
-//   GAS API calls  → network-only with timeout (need live data)
-// ================================================================
-
-const CACHE_NAME = 'fattar-v6'; // bumped: concurrency lock, note preservation, debounce + gate fixes
+// sw.js
+const CACHE_NAME = 'fattar-v7'; // bumped: migrated from GAS to Railway
 
 const STATIC_ASSETS = [
   './',
@@ -22,7 +16,6 @@ const STATIC_ASSETS = [
   './icons/icon-512.png',
 ];
 
-// ── Install: pre-cache all static assets ──────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -31,7 +24,6 @@ self.addEventListener('install', event => {
   );
 });
 
-// ── Activate: delete old caches ───────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
@@ -44,12 +36,11 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ── Fetch: route requests ──────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // GAS API → network-only with 15 s timeout; if offline/timeout → JSON error
-  if (url.includes('script.google.com')) {
+  // Railway API calls → network-only with 15s timeout
+  if (url.includes('fitar-production.up.railway.app')) {
     event.respondWith(
       (() => {
         const controller = new AbortController();
@@ -68,7 +59,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Static assets → cache-first, then network (stale-while-revalidate)
+  // Static assets → cache-first, revalidate in background
   event.respondWith(
     caches.match(event.request).then(cached => {
       const networkFetch = fetch(event.request).then(response => {

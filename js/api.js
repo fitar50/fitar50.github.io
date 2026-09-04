@@ -1,19 +1,16 @@
-// ================================================================
-// API
-// ================================================================
+// js/api.js
 
 async function api(action, params = {}) {
-  const url = new URL(SCRIPT_URL);
-  url.searchParams.set('action', action);
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : v);
-  }
-
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const res  = await fetch(url.toString(), { signal: controller.signal });
+    const res = await fetch(RAILWAY_URL + '/api', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action, ...params }),
+      signal:  controller.signal
+    });
     clearTimeout(timeoutId);
     const data = await res.json();
     if (data.success === false && data.error) throw new Error(data.error);
@@ -36,8 +33,8 @@ async function initLoad() {
     S.orderingOpen = r.orderingOpen === true;
     S.orders       = r.orders       || [];
 
-    // Keep menu cached in sessionStorage so the manager dashboard refresh
-    // (which calls individual endpoints) can still use buildMenuFlat().
+    // Cache menu in sessionStorage so manager dashboard refreshes
+    // (which call getMenu individually) can reuse it.
     try { sessionStorage.setItem('fattar_menu', JSON.stringify(S.menu)); } catch(e) {}
 
     buildMenuFlat();
