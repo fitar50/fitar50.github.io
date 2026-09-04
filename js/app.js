@@ -283,8 +283,8 @@ document.addEventListener('keydown', e => {
 /* ---------- NAME SCREEN LOGIC ---------- */
 function onNameSelectChange() {
   const val = document.getElementById('nameSelect').value;
-  // Edit button: show only when an existing name is selected
-  document.getElementById('editNameBtn').style.display  = val ? 'flex' : 'none';
+  // Edit button hidden — name changes are manager-only (via manager dashboard)
+  document.getElementById('editNameBtn').style.display  = 'none';
   document.getElementById('editNameWrap').style.display = 'none';
 }
 
