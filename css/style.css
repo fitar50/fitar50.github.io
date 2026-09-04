@@ -225,7 +225,33 @@ select:focus, input:focus { border-color: var(--orange); }
 .order-card.open .cat-chevron { transform: rotate(180deg); }
 .cat-items { display: none; padding: 0 14px 10px; }
 .category-block.open .cat-items { display: block; }
+/* ===== NOT OPEN SCREEN ===== */
+.not-open-screen {
+  min-height: calc(100vh - 76px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
 
+.not-open-icon {
+  font-size: 52px;
+  margin-bottom: 14px;
+}
+
+.not-open-title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.not-open-sub {
+  color: var(--grey);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
 /* ===== ITEM ROW ===== */
 .item-row {
   display: flex; align-items: center; justify-content: space-between;
