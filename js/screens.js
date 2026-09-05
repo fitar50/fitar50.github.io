@@ -242,6 +242,7 @@ function renderClosedOrder(name, items) {
 /* ---------- MANAGER LOGIN ---------- */
 function renderManagerLogin() {
   document.getElementById('mgrCodeInput').value = '';
+  resetBtn(document.querySelector('#screen-mgr-login .btn'));
   showScreen('screen-mgr-login');
 }
 
