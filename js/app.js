@@ -12,7 +12,8 @@ const S = {
   orderingOpen: false,       // NEW: manager controls whether ordering is open
   currentName: null,
   currentQty: {},
-  currentNotes: {},          // NEW: { [itemName]: noteText }
+  currentNotes: {},          // { [itemName]: noteText }
+  currentNoteQty: {},        // { [itemName]: howManyHaveTheNote } — defaults to qty (all)
   mgrKey: null,
   orderedBy: null,
   editName: null,
@@ -128,7 +129,7 @@ async function init() {
 // Rapid UI actions (qty steppers, expand/collapse, note toggle) are EXEMPT so
 // users can tap +/- quickly — the old global 200 ms guard swallowed those taps.
 let _lastClickTime = 0;
-const NO_DEBOUNCE = new Set(['qty', 'editQty', 'toggleNote', 'toggleCat', 'toggleOC']);
+const NO_DEBOUNCE = new Set(['qty', 'editQty', 'toggleNote', 'toggleCat', 'toggleOC', 'noteQtyAdj']);
 
 /* ---------- EVENT DELEGATION ---------- */
 document.addEventListener('click', e => {
@@ -159,10 +160,11 @@ document.addEventListener('click', e => {
     case 'cancelMyOrder': handleCancelOrder(el); break;
 
     case 'goBackToName':
-      S.currentQty   = {};
-      S.currentNotes = {};
-      S.isDirty      = false;
-      S.orderedBy    = null;
+      S.currentQty     = {};
+      S.currentNotes   = {};
+      S.currentNoteQty = {};
+      S.isDirty        = false;
+      S.orderedBy      = null;
       renderNameScreen();
       break;
 
@@ -177,6 +179,12 @@ document.addEventListener('click', e => {
     case 'toggleNote': {
       const id = parseInt(el.dataset.id, 10);
       toggleNoteInput(id);
+      break;
+    }
+    case 'noteQtyAdj': {
+      const id    = parseInt(el.dataset.id,    10);
+      const delta = parseInt(el.dataset.delta, 10);
+      adjNoteQty(id, delta);
       break;
     }
     case 'toggleCat': {
@@ -315,28 +323,31 @@ async function proceedWithName() {
 
   resetBtn(btn);
 
-  S.currentQty   = {};
-  S.currentNotes = {};
-  S.isDirty      = false;
+  S.currentQty     = {};
+  S.currentNotes   = {};
+  S.currentNoteQty = {};
+  S.isDirty        = false;
 
   const existing = S.orders.find(o => normAr(o.name) === normAr(name));
   if (existing) {
+    // Helper: merge potentially-split items back into currentQty/Notes/NoteQty
+    const restore = items => items.forEach(i => {
+      S.currentQty[i.name]     = (S.currentQty[i.name]     || 0) + i.qty;
+      if (i.note) {
+        S.currentNotes[i.name]   = i.note;
+        S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty;
+      }
+    });
     if (S.orderedBy) {
       showConfirm(`عند ${h(name)} طلب موجود — هتعدل عليه؟`, () => {
         S.currentName = name;
-        existing.items.forEach(i => {
-          S.currentQty[i.name] = i.qty;
-          if (i.note) S.currentNotes[i.name] = i.note;
-        });
+        restore(existing.items);
         renderOrderScreen(name);
       });
       return;
     } else {
       S.currentName = name;
-      existing.items.forEach(i => {
-        S.currentQty[i.name] = i.qty;
-        if (i.note) S.currentNotes[i.name] = i.note;
-      });
+      restore(existing.items);
       renderSubmittedScreen();
       return;
     }
@@ -394,7 +405,51 @@ function toggleNoteInput(id) {
   if (!wrap) return;
   const isOpen = wrap.style.display === 'block';
   wrap.style.display = isOpen ? 'none' : 'block';
-  if (!isOpen && input) setTimeout(() => input.focus(), 60);
+  const item = S.menuFlat[id];
+  if (!isOpen) {
+    // Opening: init noteQty to current qty if not already set, then show counter
+    if (input) setTimeout(() => input.focus(), 60);
+    if (item) {
+      const qty = S.currentQty[item.name] || 1;
+      if (S.currentNoteQty[item.name] === undefined) {
+        S.currentNoteQty[item.name] = qty;
+      }
+      _refreshNoteQtyDisplay(id, qty);
+    }
+  } else {
+    // Closing: hide counter; if note was also cleared, drop noteQty entry
+    if (item && !S.currentNotes[item.name]) delete S.currentNoteQty[item.name];
+    _refreshNoteQtyDisplay(id, 0); // passing 0 hides the row
+  }
+}
+
+/* Adjust how many of an item the note applies to (+1 / -1) */
+function adjNoteQty(id, delta) {
+  const item = S.menuFlat[id];
+  if (!item) return;
+  const qty = S.currentQty[item.name] || 1;
+  const cur = S.currentNoteQty[item.name] ?? qty;
+  S.currentNoteQty[item.name] = Math.min(qty, Math.max(1, cur + delta));
+  _refreshNoteQtyDisplay(id, qty);
+}
+
+/* Show/hide the note-qty row and sync its number + "of N" label */
+function _refreshNoteQtyDisplay(id, totalQty) {
+  const item  = S.menuFlat[id];
+  const nqrow = document.getElementById(`nqrow-${id}`);
+  if (!nqrow || !item) return;
+  const nwrap = document.getElementById(`nwrap-${id}`);
+  const noteIsOpen = nwrap && nwrap.style.display === 'block';
+  if (noteIsOpen && totalQty > 1) {
+    const nq = S.currentNoteQty[item.name] ?? totalQty;
+    const numEl = document.getElementById(`nqnum-${id}`);
+    const ofEl  = document.getElementById(`nqof-${id}`);
+    if (numEl) numEl.textContent = nq;
+    if (ofEl)  ofEl.textContent  = `من ${totalQty}`;
+    nqrow.style.display = 'flex';
+  } else {
+    nqrow.style.display = 'none';
+  }
 }
 
 /* ---------- ORDER SCREEN LOGIC ---------- */
@@ -404,10 +459,11 @@ function handleCancelOrder(btn) {
     setBtnLoading(btn, 'جاري الإلغاء');
     try {
       await cancelOrder(S.currentName);
-      S.orders       = S.orders.filter(o => normAr(o.name) !== normAr(S.currentName));
-      S.currentQty   = {};
-      S.currentNotes = {};
-      S.isDirty      = false;
+      S.orders         = S.orders.filter(o => normAr(o.name) !== normAr(S.currentName));
+      S.currentQty     = {};
+      S.currentNotes   = {};
+      S.currentNoteQty = {};
+      S.isDirty        = false;
       resetBtn(btn);
       S.currentName  = null;
       showToast('تم إلغاء طلبك ✓');
@@ -421,9 +477,10 @@ function handleCancelOrder(btn) {
 
 function clearAllItems() {
   if (!Object.keys(S.currentQty).length) return;
-  S.currentQty   = {};
-  S.currentNotes = {};
-  S.isDirty      = false;
+  S.currentQty     = {};
+  S.currentNotes   = {};
+  S.currentNoteQty = {};
+  S.isDirty        = false;
   document.querySelectorAll('.qty-num').forEach(el => {
     el.textContent = '0';
     el.classList.remove('nonzero');
@@ -445,19 +502,26 @@ function chgQty(id, delta) {
 
   if (next === 0) {
     delete S.currentQty[item.name];
-    // Clear note and hide note UI when item is deselected
+    // Clear note, noteQty, and hide note UI when item is deselected
     delete S.currentNotes[item.name];
+    delete S.currentNoteQty[item.name];
     const noteBtn  = document.getElementById(`nbtn-${id}`);
     const noteWrap = document.getElementById(`nwrap-${id}`);
     const noteInp  = document.getElementById(`ninput-${id}`);
     if (noteBtn)  { noteBtn.style.display = 'none'; noteBtn.classList.remove('has-note'); }
     if (noteWrap) { noteWrap.style.display = ''; }
     if (noteInp)  { noteInp.value = ''; }
+    _refreshNoteQtyDisplay(id, 0);
   } else {
     S.currentQty[item.name] = next;
     // Show note button when item is selected
     const noteBtn = document.getElementById(`nbtn-${id}`);
     if (noteBtn) noteBtn.style.display = '';
+    // If noteQty exists, cap it to new qty and refresh the "of N" label
+    if (S.currentNoteQty[item.name] !== undefined) {
+      S.currentNoteQty[item.name] = Math.min(S.currentNoteQty[item.name], next);
+    }
+    _refreshNoteQtyDisplay(id, next);
   }
 
   const numEl = document.getElementById(`qn-${id}`);
@@ -469,13 +533,22 @@ function chgQty(id, delta) {
 }
 
 async function submitOrder() {
-  const items = Object.entries(S.currentQty)
+  const items = [];
+  Object.entries(S.currentQty)
     .filter(([, q]) => q > 0)
-    .map(([name, qty]) => {
-      const obj = { name, qty, price: findPrice(name) };
-      const note = (S.currentNotes[name] || '').trim();
-      if (note) obj.note = note;
-      return obj;
+    .forEach(([name, qty]) => {
+      const note    = (S.currentNotes[name] || '').trim();
+      const noteQty = S.currentNoteQty[name] ?? qty;
+      if (!note || noteQty >= qty) {
+        // No note, or note applies to all — single entry
+        const obj = { name, qty, price: findPrice(name) };
+        if (note) obj.note = note;
+        items.push(obj);
+      } else {
+        // Partial note — split: noteQty items WITH note, rest WITHOUT
+        items.push({ name, qty: noteQty,       note, price: findPrice(name) });
+        items.push({ name, qty: qty - noteQty,       price: findPrice(name) });
+      }
     });
 
   if (!items.length) { showToast('ما اخترتش حاجة'); return; }
@@ -524,19 +597,28 @@ function editMyOrder() {
     renderClosedScreen(S.currentName);
     return;
   }
-  // Restore notes from current order record
+  // Restore qty + notes + noteQty from the stored (possibly split) items
   const order = S.orders.find(o => o.name === S.currentName);
-  S.currentNotes = {};
-  if (order) order.items.forEach(i => { if (i.note) S.currentNotes[i.name] = i.note; });
+  S.currentQty     = {};
+  S.currentNotes   = {};
+  S.currentNoteQty = {};
+  if (order) order.items.forEach(i => {
+    S.currentQty[i.name]     = (S.currentQty[i.name]     || 0) + i.qty;
+    if (i.note) {
+      S.currentNotes[i.name]   = i.note;
+      S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty;
+    }
+  });
   renderOrderScreen(S.currentName);
 }
 
 function orderForAnother() {
-  S.orderedBy    = S.currentName;
-  S.currentName  = null;
-  S.currentQty   = {};
-  S.currentNotes = {};
-  S.isDirty      = false;
+  S.orderedBy      = S.currentName;
+  S.currentName    = null;
+  S.currentQty     = {};
+  S.currentNotes   = {};
+  S.currentNoteQty = {};
+  S.isDirty        = false;
   renderNameScreen();
 }
 

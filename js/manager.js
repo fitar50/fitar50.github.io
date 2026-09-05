@@ -300,7 +300,8 @@ function openModal(name) {
   S.editQty   = {};
   S.editNotes = {};   // preserve existing per-item notes through the edit
   if (order) order.items.forEach(i => {
-    S.editQty[i.name] = i.qty;
+    // Sum qty across split entries (e.g. 1 with note + 1 plain → show as 2 total)
+    S.editQty[i.name] = (S.editQty[i.name] || 0) + i.qty;
     if (i.note) S.editNotes[i.name] = i.note;
   });
 

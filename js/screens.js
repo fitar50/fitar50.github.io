@@ -72,6 +72,8 @@ function renderOrderScreen(name) {
       const id           = flatItem ? flatItem.id : 0;
       const qty          = S.currentQty[item.name] || 0;
       const existingNote = S.currentNotes[item.name] || '';
+      const existingNoteQty = S.currentNoteQty[item.name] ?? qty;
+      const showNoteQtyRow  = !!(existingNote && qty > 1);
       // Each item is wrapped in .item-wrap so the note button and input
       // can live below the item row without breaking the border separators.
       // The note button is hidden until qty > 0 (shown by chgQty in app.js).
@@ -93,6 +95,15 @@ function renderOrderScreen(name) {
           <div class="note-input-wrap" id="nwrap-${id}"${existingNote ? ' style="display:block"' : ''}>
             <input class="note-input" id="ninput-${id}" data-id="${id}" type="text"
               placeholder="مثلاً: بدون طماطم" maxlength="200" value="${h(existingNote)}">
+            <div class="note-qty-row" id="nqrow-${id}" style="${showNoteQtyRow ? 'display:flex' : 'display:none'}">
+              <span class="note-qty-label">يطبق على</span>
+              <div class="note-qty-ctrl">
+                <button class="note-qty-btn" data-action="noteQtyAdj" data-id="${id}" data-delta="-1">−</button>
+                <span class="note-qty-num" id="nqnum-${id}">${existingNoteQty}</span>
+                <button class="note-qty-btn" data-action="noteQtyAdj" data-id="${id}" data-delta="+1">+</button>
+              </div>
+              <span class="note-qty-of" id="nqof-${id}">من ${qty}</span>
+            </div>
           </div>
         </div>`;
     });
@@ -141,14 +152,9 @@ function renderSubmittedScreen() {
   const subLabel = document.getElementById('subLabel');
   subLabel.textContent = submitTime ? `تم حفظ طلبك — ${submitTime}` : 'تم حفظ طلبك بنجاح!';
 
-  const items = Object.entries(S.currentQty)
-    .filter(([, q]) => q > 0)
-    .map(([name, qty]) => {
-      const obj  = { name, qty, price: findPrice(name) };
-      const note = (S.currentNotes[name] || '').trim();
-      if (note) obj.note = note;
-      return obj;
-    });
+  // Read the actual stored items (which may be split e.g. 1 with note + 1 plain)
+  const order = S.orders.find(o => normAr(o.name) === normAr(S.currentName));
+  const items = order ? order.items : [];
   const foodTotal = items.reduce((s, i) => s + i.price * i.qty, 0);
   // Bug #8: use server-side count (kept fresh by poll) when available;
   // S.orders is only fetched once at init so it can lag behind reality

@@ -361,6 +361,31 @@ select:focus, input:focus { border-color: var(--orange); }
   color: var(--grey);
   margin-top: 3px;
 }
+/* "يطبق على − N +" row inside note-input-wrap (order screen) */
+.note-qty-row {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px 2px;
+  font-size: 13px;
+  color: var(--grey);
+  direction: rtl;
+}
+.note-qty-label { flex-shrink: 0; }
+.note-qty-ctrl  { display: flex; align-items: center; gap: 4px; }
+.note-qty-btn {
+  width: 28px; height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+.note-qty-btn:active { background: var(--border); }
+.note-qty-num { min-width: 20px; text-align: center; font-weight: 600; color: var(--orange); }
+.note-qty-of  { color: var(--grey); font-size: 12px; }
 .trow .note-alert {
   font-size: 12px; color: var(--orange-dark); font-weight: 700;
   background: #fff; padding: 6px 10px; border-radius: 8px;
