@@ -1,4 +1,4 @@
-const RAILWAY_URL     = 'https://fitar-production.up.railway.app';
+const RAILWAY_URL     = 'https://newfitarbackend-production.up.railway.app';
 const MGR_PARAM       = 'mgr';
 const SUPER_MGR_PARAM = 'supermgr';
 
