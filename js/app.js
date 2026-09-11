@@ -78,22 +78,30 @@ function startUserPoll() {
       // The day was reset (or unlocked) while the user was on the closed screen.
       // Without this they keep staring at yesterday's order and its totals.
       if (!r.locked && S.isLocked) {
-        S.isLocked = false;
-        S.lockTime = '';
-        S.orderingOpen = r.orderingOpen === true;
         S.currentName = null;
         S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
         S.isDirty = false;
-        try {
-          const fresh = await api('getOrders');
-          if (fresh && fresh.data) S.orders = fresh.data;
-        } catch (e) { /* ignore */ }
+        // Full refetch, not just orders: a reset must also refresh lastOrders
+        // (the "same as last time?" prompt), the menu and names, on already-open
+        // clients that never reloaded. Without this S.lastOrders stays whatever
+        // it was at page load (usually empty) and the repeat prompt never shows.
+        const ok = await initLoad();
+        // getStatus (r) is authoritative for this poll cycle; initLoad is only to
+        // refresh menu/names/lastOrders/orders. Re-apply the flags either way.
+        S.isLocked = false;
+        S.lockTime = '';
+        S.orderingOpen = r.orderingOpen === true;
+        if (!ok) { /* offline: keep whatever data we had, flags above still apply */ }
         showToast('اتعمل تصفير — يوم جديد');
         if (S.orderingOpen) renderNameScreen(); else renderNotOpenScreen();
         return;
       }
 
       if (r.orderingOpen === true && !S.orderingOpen && screenId === 'screen-not-open') {
+        S.orderingOpen = true;
+        // Refresh menu, names and lastOrders before ordering starts, so the
+        // "same as last time?" prompt has current data on already-open clients.
+        await initLoad();
         S.orderingOpen = true;
         renderNameScreen();
         return;

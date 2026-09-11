@@ -20,6 +20,18 @@ function renderNameScreen() {
   fillNameDropdown('nameSelect', true);
   document.getElementById('nameSelect').value = '';
 
+  // "النهاردة هنطلب من ..." so people know which restaurant they're ordering from.
+  const _rb = document.getElementById('todayRestaurantBanner');
+  if (_rb) {
+    const rest = (S.restaurants || []).find(r => r.id === S.activeRestaurantId);
+    if (rest && rest.name) {
+      _rb.textContent = '🍽️ النهاردة هنطلب من ' + rest.name;
+      _rb.style.display = 'block';
+    } else {
+      _rb.style.display = 'none';
+    }
+  }
+
   const previewEl = document.getElementById('lastOrderPreview');
   if (previewEl) previewEl.style.display = 'none';
 

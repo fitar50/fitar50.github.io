@@ -19,7 +19,7 @@ node run.js && node cache.js && node focus.js && node closed.js && node rounding
 | `closed.js` | Post-lock collector change, reset detection (~35s, real poll timing) | 6 |
 | `rounding.js` | Per-person rounding rule + guards, collected/surplus math, no rounded figure in the restaurant text | 25 |
 
-**109 assertions.** `api.json` holds the stubbed API responses.
+**111 assertions.** `api.json` holds the stubbed API responses.
 
 ## Two things that will trip you up
 

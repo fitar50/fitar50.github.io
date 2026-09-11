@@ -54,6 +54,9 @@ w.addEventListener('load', () => setTimeout(async () => {
   const click = sel => { const e=$(sel); if(!e) return false; e.click(); return true; };
   try{
     ok('init -> name screen', active()==='screen-name', active());
+    ok('today restaurant banner shows the active restaurant',
+       $('#todayRestaurantBanner').style.display!=='none' && $('#todayRestaurantBanner').textContent.includes('كشري'),
+       $('#todayRestaurantBanner').textContent.trim());
     ok('S.deliveryFee from server', w.eval('S').deliveryFee===25, String(w.eval('S').deliveryFee));
     ok('noteSuggestions loaded', Object.keys(w.eval('S').noteSuggestions).length===1);
     ok('name select full width (pencil gone)', !$('#editNameBtn'));

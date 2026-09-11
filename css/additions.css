@@ -459,3 +459,9 @@
 /* Manager edit modal: per-item note field (reuses .note-input / .note-chips). */
 .mgr-note-wrap { margin-top: 8px; }
 .mgr-note-wrap .note-chips { margin-bottom: 6px; }
+
+/* The order screen's submit/cancel bar is position:fixed and overlaps the last
+   menu items when the last category ("أخرى") is expanded. Reserve space below
+   the menu so the last item can scroll clear of the bar, including the taller
+   state when the "مسح الكل" button is visible plus the phone's home indicator. */
+#menuContainer { margin-bottom: calc(180px + env(safe-area-inset-bottom, 0px)); }

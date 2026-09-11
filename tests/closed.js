@@ -29,8 +29,11 @@ w.addEventListener('load',()=>setTimeout(async()=>{
   // MANAGER RESETS THE DAY
   API.getStatus={...API.getStatus, locked:false, lockTime:'', orderingOpen:false, ordersCount:0};
   API.getOrders={success:true,data:[]};
+  API.getAll={...API.getAll, lastOrders:{'سارة':[{name:'شاي',qty:1,price:10}]}};
   await new Promise(r=>setTimeout(r,11000));
   ok('reset detected on closed screen', active()==='screen-not-open', active());
   ok('local lock state cleared', w.eval('S.isLocked')===false);
+  ok('reset refetched lastOrders (repeat-prompt source)', !!w.eval("S.lastOrders && S.lastOrders['سارة']"),
+     JSON.stringify(w.eval('S.lastOrders')));
   process.exit(0);
 },400));
