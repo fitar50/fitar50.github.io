@@ -455,3 +455,7 @@
 /* Manager summary: surplus collected above the restaurant bill, or short of it. */
 .ts-surplus { color: #2e7d32; font-weight: 700; }
 .ts-short   { color: #c62828; font-weight: 700; }
+
+/* Manager edit modal: per-item note field (reuses .note-input / .note-chips). */
+.mgr-note-wrap { margin-top: 8px; }
+.mgr-note-wrap .note-chips { margin-bottom: 6px; }

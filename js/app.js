@@ -29,6 +29,7 @@ const S = {
   deliveryFee: 0,
   // { "<item name>": ["note", ...] } for the active restaurant only.
   noteSuggestions: {},
+  lastOrders: {},
 
   // New: multi-restaurant + payment
   restaurants: [],
@@ -56,7 +57,7 @@ function startUserPoll() {
     const screenId = active ? active.id : null;
     // screen-closed is included on purpose: money changes hands AFTER locking,
     // so that is exactly when a collector change has to reach people.
-    const relevant = ['screen-name', 'screen-order', 'screen-submitted', 'screen-not-open', 'screen-closed'];
+    const relevant = ['screen-name', 'screen-order', 'screen-submitted', 'screen-not-open', 'screen-closed', 'screen-repeat'];
     if (!relevant.includes(screenId)) return;
 
     try {
@@ -105,7 +106,7 @@ function startUserPoll() {
       // screen-order is deliberately excluded: kicking them out would destroy
       // in-progress selections, and submitOrder already redirects on failure.
       if (r.orderingOpen === false && S.orderingOpen &&
-          ['screen-name', 'screen-submitted'].includes(screenId)) {
+          ['screen-name', 'screen-submitted', 'screen-repeat'].includes(screenId)) {
         S.orderingOpen = false;
         const orderGone = screenId === 'screen-submitted' &&
           !(r.ordersCount > 0 && S.orders.some(o => normAr(o.name) === normAr(S.currentName)));
@@ -121,6 +122,17 @@ function startUserPoll() {
       // Delivery fee is server-driven (restaurant fee, or the manager's daily
       // override). Apply before any re-render that shows the split.
       if (typeof r.deliveryFee === 'number') S.deliveryFee = r.deliveryFee;
+
+      // Note suggestions now ride getStatus. Refresh them, and if the user is on
+      // the order screen, update the chips in place (never re-render the order
+      // screen: it would wipe in-progress quantities and typed notes).
+      if (r.noteSuggestions) {
+        const before = JSON.stringify(S.noteSuggestions || {});
+        S.noteSuggestions = r.noteSuggestions;
+        if (screenId === 'screen-order' && JSON.stringify(S.noteSuggestions) !== before) {
+          refreshNoteChips();
+        }
+      }
 
       // Refresh the orders list when the server count moved, so the name
       // dropdown ticks and the "طلب X من Y" counter stop going stale.
@@ -210,7 +222,7 @@ async function init() {
 
 /* ---------- CLICK DEBOUNCE ---------- */
 let _lastClickTime = 0;
-const NO_DEBOUNCE = new Set(['qty', 'editQty', 'toggleNote', 'toggleCat', 'toggleOC', 'noteQtyAdj', 'smToggleCat', 'smToggleItem', 'pickNote']);
+const NO_DEBOUNCE = new Set(['qty', 'editQty', 'toggleNote', 'toggleCat', 'toggleOC', 'noteQtyAdj', 'smToggleCat', 'smToggleItem', 'pickNote', 'mgrPickNote']);
 
 /* ---------- EVENT DELEGATION ---------- */
 document.addEventListener('click', e => {
@@ -254,6 +266,11 @@ document.addEventListener('click', e => {
       pickNoteSuggestion(id, el.dataset.note || '');
       break;
     }
+    case 'mgrPickNote': {
+      const id = parseInt(el.dataset.id, 10);
+      mgrPickNoteSuggestion(id, el.dataset.note || '');
+      break;
+    }
     case 'noteQtyAdj': {
       const id = parseInt(el.dataset.id, 10); const delta = parseInt(el.dataset.delta, 10);
       adjNoteQty(id, delta); break;
@@ -264,6 +281,8 @@ document.addEventListener('click', e => {
       break;
     }
     case 'submitOrder':    submitOrder();    break;
+    case 'submitSameOrder': submitOrder();   break;
+    case 'newOrderInstead': newOrderInstead(); break;
     case 'editMyOrder':    editMyOrder();    break;
     case 'orderForAnother': orderForAnother(); break;
 
@@ -419,6 +438,7 @@ document.addEventListener('change', e => {
 
 document.addEventListener('input', e => {
   if (!e.target.matches('.note-input')) return;
+  if (e.target.classList.contains('mgr-note-input')) return;   // handled below
   const id   = parseInt(e.target.dataset.id, 10);
   const item = S.menuFlat[id];
   if (!item) return;
@@ -433,6 +453,43 @@ document.addEventListener('input', e => {
     if (btn) btn.classList.remove('has-note');
   }
 });
+
+// Manager edit modal: typing in an item's note updates the edit state. Kept
+// separate from the order-screen listener above so it writes S.editNotes, not
+// S.currentNotes.
+document.addEventListener('input', e => {
+  if (!e.target.matches('.mgr-note-input')) return;
+  chgEditNote(parseInt(e.target.dataset.id, 10), e.target.value);
+});
+
+// Set/clear the note for an item in the manager modal. A new note defaults to
+// applying to every unit of that item; an existing partial split (2 of 3) is
+// left alone unless the manager retypes.
+function chgEditNote(id, value) {
+  const item = S.menuFlat[id];
+  if (!item) return;
+  const raw = value || '';
+  if (raw.trim()) {
+    S.editNotes[item.name] = raw;
+    if (S.editNoteQty[item.name] === undefined) S.editNoteQty[item.name] = S.editQty[item.name] || 0;
+  } else {
+    delete S.editNotes[item.name];
+    delete S.editNoteQty[item.name];
+  }
+}
+
+// Tapping a suggestion chip in the modal replaces the note text (never appends),
+// mirroring the order screen.
+function mgrPickNoteSuggestion(id, note) {
+  const item = S.menuFlat[id];
+  if (!item) return;
+  const inp = document.getElementById(`mninput-${id}`);
+  if (inp) inp.value = note;
+  chgEditNote(id, note);
+  const row = document.getElementById(`mnchips-${id}`);
+  if (row) row.querySelectorAll('.note-chip').forEach(c =>
+    c.classList.toggle('selected', c.dataset.note === note));
+}
 
 /* ---------- NAME SCREEN LOGIC ---------- */
 async function proceedWithName() {
@@ -469,7 +526,50 @@ async function proceedWithName() {
     }
   }
   S.currentName = name;
+  // No order today: offer to repeat last time's order, if we have one whose
+  // items still exist on today's menu (re-priced from today's menu).
+  const last = _lastOrderFor(name);
+  const repeatItems = (last || [])
+    .filter(i => S.menuFlat.some(f => f.name === i.name))
+    .map(i => ({ name: i.name, qty: i.qty, note: i.note, price: findPrice(i.name) }));
+  if (repeatItems.length) { renderRepeatScreen(name, repeatItems); return; }
   renderOrderScreen(name);
+}
+
+// The person's last submitted order (kept across reset), matched by normalised
+// name. Returns the items array, or null.
+function _lastOrderFor(name) {
+  if (!S.lastOrders) return null;
+  const key = Object.keys(S.lastOrders).find(k => normAr(k) === normAr(name));
+  return key ? S.lastOrders[key] : null;
+}
+
+// Restore last time's items into the working order, then show the repeat prompt.
+function renderRepeatScreen(name, items) {
+  S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {}; S.isDirty = false;
+  items.forEach(i => {
+    S.currentQty[i.name] = (S.currentQty[i.name] || 0) + i.qty;
+    if (i.note) {
+      S.currentNotes[i.name]   = i.note;
+      S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty;
+    }
+  });
+  document.getElementById('repeatName').textContent = `أهلاً ${name} 👋`;
+  document.getElementById('repeatList').innerHTML = items.map(i => `
+    <div class="summary-row">
+      <span><span class="qty-tag">×${i.qty}</span>${h(i.name)}
+        ${i.note ? `<span class="summary-note">📝 ${h(i.note)}</span>` : ''}</span>
+      <span>${i.price * i.qty} جنيه</span>
+    </div>`).join('');
+  const foodTotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  document.getElementById('repeatTotalBox').innerHTML =
+    `<div class="total-box"><div class="trow grand"><span>إجمالي الطعام</span><span>${foodTotal} جنيه</span></div></div>`;
+  showScreen('screen-repeat');
+}
+
+function newOrderInstead() {
+  S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {}; S.isDirty = false;
+  renderOrderScreen(S.currentName);
 }
 
 /* ---------- NOTE TOGGLE ---------- */

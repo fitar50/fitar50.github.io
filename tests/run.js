@@ -82,6 +82,13 @@ w.addEventListener('load', () => setTimeout(async () => {
     // item with no suggestions has no chip row
     const tea = w.eval('S').menuFlat.find(i=>i.name==='شاي');
     ok('no chips when no suggestions', !w.document.getElementById(`nchips-${tea.id}`));
+    // LIVE: a note someone else just added arrives via the poll and appears
+    // without a re-render (problems 2/3).
+    w.eval(`S.noteSuggestions['شاي']=['سخن']; refreshNoteChips();`);
+    const teaChips = w.document.querySelectorAll(`#nchips-${tea.id} .note-chip`);
+    ok('refreshNoteChips adds chips live', teaChips.length===1, 'count='+teaChips.length);
+    ok('live chip carries the new note', !!teaChips[0] && teaChips[0].dataset.note==='سخن');
+    ok('typed note input still present after live refresh', !!$(`#ninput-${fi.id}`));
     // qty->0 clears chip selection
     click(`[data-action="qty"][data-id="${fi.id}"][data-delta="-1"]`);
     ok('qty 0 clears chip selection', !chips[0].classList.contains('selected'));
@@ -106,6 +113,19 @@ w.addEventListener('load', () => setTimeout(async () => {
     $('#collectorSel').value='__other__';
     $('#collectorSel').dispatchEvent(new w.Event('change',{bubbles:true}));
     ok('other reveals name input', $('#collectorOtherWrap').style.display!=='none');
+
+    // MANAGER can edit / add notes in the edit modal (problem 4)
+    const sfi = w.eval('S').menuFlat.find(i=>i.name==='ساندوتش بطاطس');
+    click('[data-action="openModal"][data-name="أحمد"]');
+    await new Promise(r=>setTimeout(r,200));
+    const mnin = w.document.getElementById(`mninput-${sfi.id}`);
+    ok('modal renders a note input for the ordered item', !!mnin);
+    ok('modal note input shows the existing note', !!mnin && mnin.value==='كاتشب بس', mnin && mnin.value);
+    ok('modal shows note suggestion chips', w.document.querySelectorAll(`#mnchips-${sfi.id} .note-chip`).length===2);
+    mnin.value='من غير مخلل'; mnin.dispatchEvent(new w.Event('input',{bubbles:true}));
+    ok('editing the note updates S.editNotes', w.eval('S').editNotes['ساندوتش بطاطس']==='من غير مخلل', w.eval('S').editNotes['ساندوتش بطاطس']);
+    click('[data-action="closeModal"]');
+    await new Promise(r=>setTimeout(r,150));
 
     // SUPER MANAGER
     click('[data-action="showSuperMgrFromMgr"]');
@@ -159,6 +179,13 @@ w.addEventListener('load', () => setTimeout(async () => {
     ok('_buildPaymentBox empty when no collector',
        w.eval("(function(){const o=S.paymentInfo;S.paymentInfo={collectorName:'',paymentCash:false,paymentInstapay:false,instapayNumber:''};const r=_buildPaymentBox();S.paymentInfo=o;return r;})()")==='');
 
+    // Problem 1: the order total is one clean "حسابك" line (rounded), no hint row
+    w.eval(`S.orders=[{name:'أحمد',items:[{name:'شاي',qty:1,price:20}],orderedBy:'أحمد'}]; S.deliveryFee=25; renderClosedOrder('أحمد',[{name:'شاي',qty:1,price:20}]);`);
+    const ctb = w.document.getElementById('closedTotalBox').textContent;
+    ok('closed screen shows حسابك', ctb.includes('حسابك'), ctb.replace(/\s+/g,' ').trim());
+    ok('closed screen shows the rounded total (45)', ctb.includes('45'));
+    ok('closed screen drops the الفعلي hint row', !ctb.includes('الفعلي'));
+
     // Bug 9.5: delivery split sums EXACTLY to the fee (no piaster lost)
     ok('deliverySplit 25/3 sums to exactly 25',
        Math.round(w.eval('deliverySplit(25,3).reduce((a,b)=>a+b,0)')*100)===2500,
@@ -171,6 +198,28 @@ w.addEventListener('load', () => setTimeout(async () => {
        w.eval('JSON.stringify(deliverySplit(30,3))'));
     ok('deliverySplit one person gets the whole fee', w.eval('deliverySplit(25,1)[0]')===25);
     ok('deliverySplit zero fee is all zeros', w.eval('deliverySplit(0,3).every(x=>x===0)')===true);
+
+    // ===== SAME ORDER AS LAST TIME =====
+    w.eval(`S.lastOrders={'أحمد':[{name:'شاي',qty:2,note:'سخن',price:10}]}; S.orders=[]; S.orderedBy=null; renderNameScreen();`);
+    await new Promise(r=>setTimeout(r,200));
+    w.document.getElementById('nameSelect').value='أحمد';
+    click('[data-action="proceedWithName"]');
+    await new Promise(r=>setTimeout(r,220));
+    ok('returning name shows the repeat screen', active()==='screen-repeat', active());
+    ok('repeat screen lists last order item', w.document.getElementById('repeatList').textContent.includes('شاي'));
+    ok('repeat screen shows the saved note', w.document.getElementById('repeatList').textContent.includes('سخن'));
+    ok('repeat restored the working order', w.eval('S').currentQty['شاي']===2);
+    click('[data-action="newOrderInstead"]');
+    await new Promise(r=>setTimeout(r,160));
+    ok('new order goes to the order screen', active()==='screen-order', active());
+    ok('new order cleared the restored qty', !w.eval('S').currentQty['شاي']);
+    // A name with no saved order goes straight to the order screen
+    w.eval(`S.lastOrders={}; S.orders=[]; renderNameScreen();`);
+    await new Promise(r=>setTimeout(r,200));
+    w.document.getElementById('nameSelect').value='سارة';
+    click('[data-action="proceedWithName"]');
+    await new Promise(r=>setTimeout(r,200));
+    ok('no saved order -> straight to order screen', active()==='screen-order', active());
 
     console.log('\nJS ERRORS:', errors.length? errors : 'none');
     process.exit(0);

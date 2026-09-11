@@ -13,13 +13,13 @@ node run.js && node cache.js && node focus.js && node closed.js && node rounding
 
 | File | Covers | Assertions |
 |---|---|---|
-| `run.js` | Name/order screens, note chips, manager dashboard, super manager, `deliverySplit` | 48 |
+| `run.js` | Name/order screens, note chips + live refresh, repeat-last-order, manager + edit-modal notes, super manager, `deliverySplit` | 65 |
 | `cache.js` | SW registration, asset versioning, no reload loop | 9 |
 | `focus.js` | Typing survives the 10s dashboard refresh | 4 |
 | `closed.js` | Post-lock collector change, reset detection (~35s, real poll timing) | 6 |
 | `rounding.js` | Per-person rounding rule + guards, collected/surplus math, no rounded figure in the restaurant text | 25 |
 
-**92 assertions.** `api.json` holds the stubbed API responses.
+**109 assertions.** `api.json` holds the stubbed API responses.
 
 ## Two things that will trip you up
 

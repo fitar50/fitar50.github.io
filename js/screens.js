@@ -62,6 +62,48 @@ function _buildNoteChips(id, itemName, existingNote) {
   return `<div class="note-chips" id="nchips-${id}">${chips}</div>`;
 }
 
+// Update the order screen's note chips IN PLACE when new suggestions arrive from
+// the poll, so a phrasing someone else just used ("كاتشب بس") appears for the
+// next person without a full re-render (which would wipe their in-progress
+// quantities and typed text). Only the chip container is touched; the note
+// input, its value, and its focus are never disturbed.
+function refreshNoteChips() {
+  if (!Array.isArray(S.menuFlat)) return;
+  S.menuFlat.forEach(fi => {
+    const id   = fi.id;
+    const wrap = document.getElementById(`nwrap-${id}`);
+    if (!wrap) return;                                   // item not on screen
+    const want     = ((S.noteSuggestions && S.noteSuggestions[fi.name]) || []).slice(0, 8);
+    const existing = document.getElementById(`nchips-${id}`);
+    if (existing) {
+      // Skip items whose suggestion set is unchanged, so chips the user is
+      // interacting with are never needlessly torn down and rebuilt.
+      const have = [...existing.querySelectorAll('.note-chip')].map(c => c.dataset.note);
+      if (have.length === want.length && have.every((n, i) => n === want[i])) return;
+    } else if (!want.length) {
+      return;
+    }
+    const input   = document.getElementById(`ninput-${id}`);
+    const current  = input ? input.value : (S.currentNotes[fi.name] || '');
+    const html     = _buildNoteChips(id, fi.name, current);   // '' when no suggestions
+    if (existing) { html ? (existing.outerHTML = html) : existing.remove(); }
+    else if (html) { wrap.insertAdjacentHTML('afterbegin', html); }
+  });
+}
+
+// Same chips for the manager's edit modal. Distinct ids/action so they never
+// collide with the order screen's chips, which may still exist in a hidden
+// screen in the same session.
+function _buildModalNoteChips(id, itemName, existingNote) {
+  const list = (S.noteSuggestions && S.noteSuggestions[itemName]) || [];
+  if (!list.length) return '';
+  const chips = list.slice(0, 8).map(note => {
+    const sel = (note === existingNote) ? ' selected' : '';
+    return `<button class="note-chip${sel}" data-action="mgrPickNote" data-id="${id}" data-note="${h(note)}">${h(note)}</button>`;
+  }).join('');
+  return `<div class="note-chips" id="mnchips-${id}">${chips}</div>`;
+}
+
 /* ---------- ORDER SCREEN ---------- */
 function renderOrderScreen(name) {
   document.getElementById('orderTitle').textContent = `طلب ${h(name)} 🥙`;
@@ -185,8 +227,7 @@ function renderSubmittedScreen() {
         <span>التوصيل (${people} أشخاص — تقريبي)<br>${delNote}</span>
         <span>${delShare.toFixed(2)} جنيه</span>
       </div>
-      <div class="trow grand"><span>ابعت (تقريبي)</span><span>${roundPersonTotal(grand).toFixed(0)} جنيه</span></div>
-      <div class="trow trow-hint"><span>الفعلي</span><span>${grand.toFixed(2)} جنيه</span></div>
+      <div class="trow grand"><span>حسابك</span><span>${roundPersonTotal(grand)} جنيه</span></div>
     </div>`;
 
   // Payment info box
@@ -253,8 +294,7 @@ function renderClosedOrder(name, items) {
     <div class="total-box">
       <div class="trow"><span>إجمالي الطعام</span><span>${foodTotal} جنيه</span></div>
       <div class="trow"><span>التوصيل (${people} أشخاص)</span><span>${delShare.toFixed(2)} جنيه</span></div>
-      <div class="trow grand"><span>المطلوب منك</span><span>${roundPersonTotal(grand).toFixed(0)} جنيه</span></div>
-      <div class="trow trow-hint"><span>الفعلي</span><span>${grand.toFixed(2)} جنيه</span></div>
+      <div class="trow grand"><span>حسابك</span><span>${roundPersonTotal(grand)} جنيه</span></div>
     </div>`;
 
   // Payment usually happens AFTER locking, so the closed screen is exactly

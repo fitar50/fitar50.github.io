@@ -35,6 +35,7 @@ async function initLoad() {
     S.activeRestaurantId = r.activeRestaurantId || null;
     S.deliveryFee       = typeof r.deliveryFee === 'number' ? r.deliveryFee : 0;
     S.noteSuggestions   = r.noteSuggestions   || {};
+    S.lastOrders        = r.lastOrders        || {};
     S.paymentInfo       = r.paymentInfo       || { collectorName: '', paymentCash: false, paymentInstapay: false, instapayNumber: '' };
 
     try { sessionStorage.setItem('fattar_menu', JSON.stringify(S.menu)); } catch(e) {}

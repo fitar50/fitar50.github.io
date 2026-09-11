@@ -612,19 +612,27 @@ function renderModal() {
     block.className = 'category-block' + (selCount > 0 ? ' open' : '');
     let itemsHtml = '';
     items.forEach(item => {
-      const fi  = S.menuFlat.find(f => f.name === item.name);
-      const id  = fi ? fi.id : 0;
-      const qty = S.editQty[item.name] || 0;
+      const fi   = S.menuFlat.find(f => f.name === item.name);
+      const id   = fi ? fi.id : 0;
+      const qty  = S.editQty[item.name] || 0;
+      const note = S.editNotes[item.name] || '';
       itemsHtml += `
-        <div class="item-row">
-          <div class="item-info">
-            <div class="item-name">${h(item.name)}</div>
-            <div class="item-price">${item.price} جنيه</div>
+        <div class="item-wrap">
+          <div class="item-row">
+            <div class="item-info">
+              <div class="item-name">${h(item.name)}</div>
+              <div class="item-price">${item.price} جنيه</div>
+            </div>
+            <div class="qty">
+              <button class="qty-btn minus" data-action="editQty" data-id="${id}" data-delta="-1">−</button>
+              <div class="qty-num ${qty > 0 ? 'nonzero' : ''}" id="mqn-${id}">${qty}</div>
+              <button class="qty-btn plus"  data-action="editQty" data-id="${id}" data-delta="+1">+</button>
+            </div>
           </div>
-          <div class="qty">
-            <button class="qty-btn minus" data-action="editQty" data-id="${id}" data-delta="-1">−</button>
-            <div class="qty-num ${qty > 0 ? 'nonzero' : ''}" id="mqn-${id}">${qty}</div>
-            <button class="qty-btn plus"  data-action="editQty" data-id="${id}" data-delta="+1">+</button>
+          <div class="mgr-note-wrap" id="mnwrap-${id}" style="display:${qty > 0 ? 'block' : 'none'}">
+            ${_buildModalNoteChips(id, item.name, note)}
+            <input class="note-input mgr-note-input" id="mninput-${id}" data-id="${id}" type="text"
+              placeholder="📝 ملاحظة (اختياري)" maxlength="200" value="${h(note)}">
           </div>
         </div>`;
     });
@@ -658,6 +666,10 @@ function chgEditQty(id, delta) {
   const el = document.getElementById(`mqn-${id}`);
   el.textContent = next;
   el.classList.toggle('nonzero', next > 0);
+  // Show the note field only for items actually in the order; clear it on remove.
+  const nwrap = document.getElementById(`mnwrap-${id}`);
+  if (nwrap) nwrap.style.display = next > 0 ? 'block' : 'none';
+  if (next === 0) { const ni = document.getElementById(`mninput-${id}`); if (ni) ni.value = ''; }
   const items = S.menu[item.category] || [];
   const count = items.filter(i => (S.editQty[i.name] || 0) > 0).length;
   const badge = document.getElementById(`mbadge-${item.category}`);

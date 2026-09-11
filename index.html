@@ -11,8 +11,8 @@
 <!-- ?v= MUST be bumped on every deploy, together with CACHE_NAME in sw.js.
      Without it GitHub Pages' HTTP caching pins these files in the browser and
      users keep running old code for days. That was the original bug. -->
-<link rel="stylesheet" href="css/style.css?v=5">
-<link rel="stylesheet" href="css/additions.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/additions.css?v=6">
 </head>
 <body>
 <div id="app">
@@ -117,7 +117,22 @@
   <a class="back-link mgr-entry-link" data-action="goBackToName">← تغيير الاسم</a>
 </div>
 
-<!-- ======================== CLOSED SCREEN ======================== -->
+<!-- ==================== REPEAT (same as last time?) ==================== -->
+<div id="screen-repeat" class="screen">
+  <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
+  <div class="big-icon">🔁</div>
+  <p class="sub-name" id="repeatName"></p>
+  <p class="sub-label">تحب تطلب نفس طلب المرة اللي فاتت؟</p>
+  <div class="card" style="margin-bottom:12px;">
+    <div style="padding:14px 16px 4px;" id="repeatList"></div>
+  </div>
+  <div id="repeatTotalBox"></div>
+  <div class="act-row" style="margin-top:12px;">
+    <button class="btn btn-primary" data-action="submitSameOrder">✅ ابعت نفس الطلب</button>
+    <button class="btn btn-outline" data-action="newOrderInstead">➕ اطلب من جديد</button>
+  </div>
+  <a class="back-link mgr-entry-link" data-action="goBackToName">← تغيير الاسم</a>
+</div>
 <div id="screen-closed" class="screen">
   <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
   <div class="lock-icon">🔒</div>
@@ -281,13 +296,13 @@
 
 </div><!-- #app -->
 
-<script src="js/config.js?v=5"></script>
-<script src="js/utils.js?v=5"></script>
-<script src="js/api.js?v=5"></script>
-<script src="js/screens.js?v=5"></script>
-<script src="js/manager.js?v=5"></script>
-<script src="js/supermanager.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/config.js?v=6"></script>
+<script src="js/utils.js?v=6"></script>
+<script src="js/api.js?v=6"></script>
+<script src="js/screens.js?v=6"></script>
+<script src="js/manager.js?v=6"></script>
+<script src="js/supermanager.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 
 <script>
 // Service worker registration.
