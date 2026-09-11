@@ -255,7 +255,7 @@ function _buildPaymentBox() {
 
   const methods = [];
   if (pi.paymentCash)
-    methods.push(`<div class="pi-method">💵 كاش — سلّم <strong>${h(pi.collectorName)}</strong> يداً بيد</div>`);
+    methods.push(`<div class="pi-method">💵 ادفع كاش لـ <strong>${h(pi.collectorName)}</strong></div>`);
   if (pi.paymentInstapay)
     methods.push(`<div class="pi-method">📲 إنستاباي — ابعت على رقم <strong dir="ltr">${h(pi.instapayNumber)}</strong></div>`);
 
