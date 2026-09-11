@@ -36,18 +36,17 @@ function renderNameScreen() {
   if (previewEl) previewEl.style.display = 'none';
 
   const counterEl = document.getElementById('orderCounter');
-  if (counterEl) {
-    const orderedCount = S.orders.length;
-    const totalCount   = S.names.length;
-    if (totalCount > 0) {
-      const icon = orderedCount === totalCount ? '🎉' : '✅';
-      counterEl.textContent = `${icon} طلب ${orderedCount} من ${totalCount}`;
-      counterEl.style.display = 'block';
-    } else {
-      counterEl.style.display = 'none';
-    }
-  }
 
+if (counterEl) {
+  const orderedCount = S.orders.length;
+
+  if (orderedCount > 0) {
+    counterEl.textContent = `النهاردة فيه ${orderedCount} أشخاص طلبوا`;
+    counterEl.style.display = 'block';
+  } else {
+    counterEl.style.display = 'none';
+  }
+}
   const _b = document.getElementById('orderingForBanner');
   if (_b) {
     if (S.orderedBy) {
