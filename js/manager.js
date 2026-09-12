@@ -96,9 +96,9 @@ function renderManagerDashboard() {
       <div class="ts-row"><span>هيتجمع من الناس</span><span>${collected.toFixed(0)} جنيه</span></div>
       ${
         surplus > 0.005
-          ? `<div class="ts-row ts-surplus"><span>زيادة التقريب</span><span>+${surplus.toFixed(2)} جنيه</span></div>`
+          ? `<div class="ts-row ts-surplus"><span>زيادة التقريب</span><span>+${fmtNum(surplus)} جنيه</span></div>`
           : surplus < -0.005
-            ? `<div class="ts-row ts-short"><span>ناقص التقريب</span><span>${surplus.toFixed(2)} جنيه</span></div>`
+            ? `<div class="ts-row ts-short"><span>ناقص التقريب</span><span>${fmtNum(surplus)} جنيه</span></div>`
             : ''
       }
       <button class="copy-btn" id="copyOrderBtn" data-action="copyOrder">📋 نسخ الطلب للمطعم</button>`;
@@ -152,8 +152,8 @@ function renderManagerDashboard() {
           ${itemsHtml}
           <div class="oc-breakdown">
             <div class="oc-brow"><span>طعام</span><span>${food} جنيه</span></div>
-            <div class="oc-brow"><span>توصيل (${people} أشخاص)</span><span>${delShare.toFixed(2)} جنيه</span></div>
-            <div class="oc-brow"><span>الفعلي</span><span>${total.toFixed(2)} جنيه</span></div>
+            <div class="oc-brow"><span>توصيل (${people} أشخاص)</span><span>${fmtNum(delShare)} جنيه</span></div>
+            <div class="oc-brow"><span>الفعلي</span><span>${fmtNum(total)} جنيه</span></div>
             <div class="oc-brow grand"><span>للتحصيل</span><span>${rounded.toFixed(0)} جنيه</span></div>
           </div>
         </div>`;

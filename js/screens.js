@@ -237,7 +237,7 @@ function renderSubmittedScreen() {
       <div class="trow"><span>إجمالي الطعام</span><span>${foodTotal} جنيه</span></div>
       <div class="trow">
         <span>التوصيل (${people} أشخاص — تقريبي)</span>
-        <span>${delShare.toFixed(2)} جنيه</span>
+        <span>${fmtNum(delShare)} جنيه</span>
       </div>
       <div style="padding:2px 0 4px;">${delNote}</div>
       <div class="trow grand"><span>حسابك</span><span>${roundPersonTotal(grand)} جنيه</span></div>
@@ -317,7 +317,7 @@ function renderClosedOrder(name, items) {
   document.getElementById('closedTotalBox').innerHTML = `
     <div class="total-box">
       <div class="trow"><span>إجمالي الطعام</span><span>${foodTotal} جنيه</span></div>
-      <div class="trow"><span>التوصيل (${people} أشخاص)</span><span>${delShare.toFixed(2)} جنيه</span></div>
+      <div class="trow"><span>التوصيل (${people} أشخاص)</span><span>${fmtNum(delShare)} جنيه</span></div>
       <div class="trow grand"><span>حسابك</span><span>${roundPersonTotal(grand)} جنيه</span></div>
     </div>`;
 

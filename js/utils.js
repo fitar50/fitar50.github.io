@@ -52,6 +52,13 @@ function roundPersonTotal(amount) {
   return lower + step;                            // otherwise → up
 }
 
+// Format a number for display: whole numbers show no decimals (30, not 30.00),
+// fractional values show up to 2 decimals (8.33, not 8.330000).
+function fmtNum(n) {
+  const v = Number(n) || 0;
+  return v === Math.floor(v) ? String(v) : v.toFixed(2);
+}
+
 // ================================================================
 // NAVIGATION / HISTORY
 // ================================================================
