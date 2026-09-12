@@ -266,14 +266,17 @@ function _buildPaymentBox() {
 
   if (pi.paymentInstapay && pi.instapayNumber) {
     const isLink = /^https?:\/\//i.test(pi.instapayNumber.trim());
+    const ipLogo = '<img class="pi-ip-logo" alt="" src="./icons/instapay.png">';
     if (isLink) {
       cards.push(`<a href="${h(pi.instapayNumber.trim())}" target="_blank" rel="noopener" class="pi-card pi-card-instapay">
-        <div class="pi-card-label">📲 InstaPay</div>
+        ${ipLogo}
+        <div class="pi-card-label">InstaPay</div>
         <div class="pi-card-detail">اضغط هيفتح التطبيق</div>
       </a>`);
     } else {
       cards.push(`<div class="pi-card pi-card-instapay">
-        <div class="pi-card-label">📲 InstaPay</div>
+        ${ipLogo}
+        <div class="pi-card-label">InstaPay</div>
         <div class="pi-card-detail" dir="ltr">${h(pi.instapayNumber)}</div>
       </div>`);
     }

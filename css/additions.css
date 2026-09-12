@@ -121,6 +121,7 @@
 .pi-card-label { font-size: 18px; font-weight: 800; }
 .pi-card-detail { font-size: 12px; margin-top: 4px; opacity: 0.85; }
 .pi-card-instapay .pi-card-detail { opacity: 0.9; }
+.pi-ip-logo { width: 40px; height: 40px; border-radius: 10px; margin-bottom: 4px; }
 
 /* ── Super manager: login ────────────────────────────────────── */
 /* Re-uses existing .login-wrap / .login-icon / .login-title styles */
