@@ -465,3 +465,26 @@
    the menu so the last item can scroll clear of the bar, including the taller
    state when the "مسح الكل" button is visible plus the phone's home indicator. */
 #menuContainer { margin-bottom: calc(180px + env(safe-area-inset-bottom, 0px)); }
+/* ── InstaPay tappable link button ────────────────────────────── */
+.instapay-link-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  margin-top: 4px;
+  background: #1565c0;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+}
+.instapay-link-btn:active { background: #0d47a1; }
+.pi-instapay-hint {
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  margin-top: 6px;
+}

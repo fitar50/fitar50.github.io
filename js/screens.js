@@ -36,17 +36,18 @@ function renderNameScreen() {
   if (previewEl) previewEl.style.display = 'none';
 
   const counterEl = document.getElementById('orderCounter');
-
-if (counterEl) {
-  const orderedCount = S.orders.length;
-
-  if (orderedCount > 0) {
-    counterEl.textContent = `النهاردة فيه ${orderedCount} أشخاص طلبوا`;
-    counterEl.style.display = 'block';
-  } else {
-    counterEl.style.display = 'none';
+  if (counterEl) {
+    const orderedCount = S.orders.length;
+    const totalCount   = S.names.length;
+    if (totalCount > 0) {
+      const icon = orderedCount === totalCount ? '🎉' : '✅';
+      counterEl.textContent = `${icon} طلب ${orderedCount} من ${totalCount}`;
+      counterEl.style.display = 'block';
+    } else {
+      counterEl.style.display = 'none';
+    }
   }
-}
+
   const _b = document.getElementById('orderingForBanner');
   if (_b) {
     if (S.orderedBy) {
@@ -255,9 +256,21 @@ function _buildPaymentBox() {
 
   const methods = [];
   if (pi.paymentCash)
-    methods.push(`<div class="pi-method">💵 ادفع كاش لـ <strong>${h(pi.collectorName)}</strong></div>`);
-  if (pi.paymentInstapay)
-    methods.push(`<div class="pi-method">📲 إنستاباي — ابعت على رقم <strong dir="ltr">${h(pi.instapayNumber)}</strong></div>`);
+    methods.push(`<div class="pi-method">💵 كاش — سلّم <strong>${h(pi.collectorName)}</strong> يداً بيد</div>`);
+  if (pi.paymentInstapay && pi.instapayNumber) {
+    // Detect whether the value is a full URL (ipn.eg link) or a plain phone number.
+    const isLink = /^https?:\/\//i.test(pi.instapayNumber.trim());
+    if (isLink) {
+      methods.push(`<div class="pi-method">
+        <a href="${h(pi.instapayNumber.trim())}" target="_blank" rel="noopener" class="instapay-link-btn">
+          📲 ادفع بالإنستاباي
+        </a>
+        <div class="pi-instapay-hint">هيفتح تطبيق إنستاباي — ادخل المبلغ وابعت</div>
+      </div>`);
+    } else {
+      methods.push(`<div class="pi-method">📲 إنستاباي — ابعت على رقم <strong dir="ltr">${h(pi.instapayNumber)}</strong></div>`);
+    }
+  }
 
   return `
     <div class="payment-info-box">

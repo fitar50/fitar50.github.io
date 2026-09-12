@@ -3,7 +3,7 @@
 // BUMP CACHE_NAME ON EVERY DEPLOY, and bump the matching ?v= strings in
 // index.html at the same time. Those two are the entire defence against the
 // original bug where a stale build stayed pinned in people's browsers.
-const CACHE_NAME = 'fitar-v7';
+const CACHE_NAME = 'fitar-v8';
 
 self.addEventListener('install', e => {
   // Take over immediately instead of waiting for every old tab to close.

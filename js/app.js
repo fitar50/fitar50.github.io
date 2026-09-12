@@ -103,6 +103,31 @@ function startUserPoll() {
         // "same as last time?" prompt has current data on already-open clients.
         await initLoad();
         S.orderingOpen = true;
+
+        // If this browser remembers a user, skip straight to ordering for them
+        // instead of showing the name selection screen.
+        const rem = _loadRememberedUser();
+        if (rem && S.names.some(n => normAr(n) === normAr(rem))) {
+          S.currentName = S.names.find(n => normAr(n) === normAr(rem)) || rem;
+          const ex = S.orders.find(o => normAr(o.name) === normAr(S.currentName));
+          if (ex) {
+            S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
+            ex.items.forEach(i => {
+              S.currentQty[i.name] = (S.currentQty[i.name] || 0) + i.qty;
+              if (i.note) { S.currentNotes[i.name] = i.note; S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty; }
+            });
+            renderSubmittedScreen();
+          } else {
+            const last = _lastOrderFor(S.currentName);
+            const rItems = (last || [])
+              .filter(i => S.menuFlat.some(f => f.name === i.name))
+              .map(i => ({ name: i.name, qty: i.qty, note: i.note, price: findPrice(i.name) }));
+            if (rItems.length) renderRepeatScreen(S.currentName, rItems);
+            else                renderOrderScreen(S.currentName);
+          }
+          return;
+        }
+
         renderNameScreen();
         return;
       }
@@ -213,6 +238,58 @@ async function init() {
     if (isSuperMgrMode) { renderSuperMgrLogin(); return; }
     if (isMgrMode)      { renderManagerLogin();  return; }
 
+    // ── Remembered user: skip name selection when possible ─────────
+    const remembered = _loadRememberedUser();
+    if (remembered) {
+      // Validate: name must still exist on the roster
+      const nameExists = S.names.some(n => normAr(n) === normAr(remembered));
+      if (!nameExists) {
+        _clearRememberedUser();
+      } else {
+        S.currentName = S.names.find(n => normAr(n) === normAr(remembered)) || remembered;
+
+        if (S.isLocked) {
+          startUserPoll();
+          renderClosedScreen(S.currentName);
+          return;
+        }
+        if (!S.orderingOpen) {
+          startUserPoll();
+          renderNotOpenScreen();
+          return;
+        }
+        // Ordering is open. Has this person already ordered today?
+        const existing = S.orders.find(o => normAr(o.name) === normAr(S.currentName));
+        if (existing) {
+          S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
+          existing.items.forEach(i => {
+            S.currentQty[i.name] = (S.currentQty[i.name] || 0) + i.qty;
+            if (i.note) {
+              S.currentNotes[i.name]   = i.note;
+              S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty;
+            }
+          });
+          startUserPoll();
+          renderSubmittedScreen();
+          return;
+        }
+        // No order today: offer repeat-last if available
+        const last = _lastOrderFor(S.currentName);
+        const repeatItems = (last || [])
+          .filter(i => S.menuFlat.some(f => f.name === i.name))
+          .map(i => ({ name: i.name, qty: i.qty, note: i.note, price: findPrice(i.name) }));
+        if (repeatItems.length) {
+          startUserPoll();
+          renderRepeatScreen(S.currentName, repeatItems);
+          return;
+        }
+        startUserPoll();
+        renderOrderScreen(S.currentName);
+        return;
+      }
+    }
+    // ── No remembered user (or it was cleared) ────────────────────
+
     if (S.isLocked) {
       renderClosedScreen(null);
     } else if (!S.orderingOpen) {
@@ -259,6 +336,7 @@ document.addEventListener('click', e => {
     case 'goBackToName':
       S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
       S.isDirty = false; S.orderedBy = null;
+      _clearRememberedUser();
       renderNameScreen();
       break;
 
@@ -514,6 +592,10 @@ async function proceedWithName() {
 
   resetBtn(btn);
   S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {}; S.isDirty = false;
+
+  // Remember the selected name for next visit (skip during proxy ordering:
+  // the stored identity stays as the original person, per design).
+  if (!S.orderedBy) _saveRememberedUser(name);
 
   const existing = S.orders.find(o => normAr(o.name) === normAr(name));
   if (existing) {
@@ -801,6 +883,19 @@ function lookupClosedOrder() {
   const order = S.orders.find(o => normAr(o.name) === normAr(name));
   if (!order) { showToast('مش لاقيك في الطلبات'); return; }
   renderClosedOrder(name, order.items);
+}
+
+/* ---------- REMEMBERED USER (localStorage) ---------- */
+// Lightweight "who uses this browser" — no auth, no password. Only the name
+// string is stored; the actual order always comes from the server.
+function _saveRememberedUser(name) {
+  try { localStorage.setItem('fitar_user', name); } catch (e) {}
+}
+function _loadRememberedUser() {
+  try { return localStorage.getItem('fitar_user') || null; } catch (e) { return null; }
+}
+function _clearRememberedUser() {
+  try { localStorage.removeItem('fitar_user'); } catch (e) {}
 }
 
 /* ---------- DIRTY ORDER WARNING ---------- */

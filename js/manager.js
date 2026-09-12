@@ -274,9 +274,9 @@ function _renderMgrConfig() {
       </div>
 
       <div class="cfg-row" id="instapayRow" ${curInstapay ? '' : 'style="display:none"'}>
-        <span class="cfg-label">رقم الإنستاباي</span>
-        <input id="instapayNumInp" type="tel" placeholder="01xxxxxxxxx" maxlength="20"
-          class="cfg-text-input" value="${h(curNumber)}">
+        <span class="cfg-label">لينك الإنستاباي</span>
+        <input id="instapayNumInp" type="url" placeholder="https://ipn.eg/S/..." maxlength="120"
+          class="cfg-text-input" style="direction:ltr;text-align:left;font-size:13px;" value="${h(curNumber)}">
       </div>
 
       <button class="btn btn-primary" style="width:100%;margin-top:4px;" data-action="doSavePayment">
