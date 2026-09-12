@@ -236,9 +236,10 @@ function renderSubmittedScreen() {
     <div class="total-box">
       <div class="trow"><span>إجمالي الطعام</span><span>${foodTotal} جنيه</span></div>
       <div class="trow">
-        <span>التوصيل (${people} أشخاص — تقريبي)<br>${delNote}</span>
+        <span>التوصيل (${people} أشخاص — تقريبي)</span>
         <span>${delShare.toFixed(2)} جنيه</span>
       </div>
+      <div style="padding:2px 0 4px;">${delNote}</div>
       <div class="trow grand"><span>حسابك</span><span>${roundPersonTotal(grand)} جنيه</span></div>
     </div>`;
 
@@ -256,16 +257,15 @@ function _buildPaymentBox() {
 
   const methods = [];
   if (pi.paymentCash)
-    methods.push(`<div class="pi-method">💵 كاش — سلّم <strong>${h(pi.collectorName)}</strong> يداً بيد</div>`);
+    methods.push(`<div class="pi-method">💵 كاش — ادفع كاش ل ${h(pi.collectorName)}</div>`);
   if (pi.paymentInstapay && pi.instapayNumber) {
     // Detect whether the value is a full URL (ipn.eg link) or a plain phone number.
     const isLink = /^https?:\/\//i.test(pi.instapayNumber.trim());
     if (isLink) {
       methods.push(`<div class="pi-method">
         <a href="${h(pi.instapayNumber.trim())}" target="_blank" rel="noopener" class="instapay-link-btn">
-          📲 ادفع بالإنستاباي
+          اضغط هيفتح instapay
         </a>
-        <div class="pi-instapay-hint">هيفتح تطبيق إنستاباي — ادخل المبلغ وابعت</div>
       </div>`);
     } else {
       methods.push(`<div class="pi-method">📲 إنستاباي — ابعت على رقم <strong dir="ltr">${h(pi.instapayNumber)}</strong></div>`);
