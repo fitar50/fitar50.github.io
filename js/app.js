@@ -377,7 +377,7 @@ document.addEventListener('click', e => {
 
     // Payment card
     case 'cashTap':
-      showToast('بتضغط على الزرار متوقع اني اجي اخد الفلوس يعني ولا ايه؟ مش فاهم 😂');
+      showToast('بتضغط على الزرار متوقع اني اجي اخد الفلوس يعني ولا ايه؟ مش فاهم');
       break;
 
     // Manager login
