@@ -81,24 +81,48 @@
   background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
   border: 1.5px solid #a5d6a7;
   border-radius: 14px;
-  padding: 10px 14px;
+  padding: 10px 12px;
 }
 .pi-title {
   font-size: 13px;
   font-weight: 700;
   color: #2e7d32;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  text-align: center;
 }
-.pi-method {
-  font-size: 13px;
-  color: #388e3c;
-  line-height: 1.6;
+
+/* ── Payment cards grid ───────────────────────────────────── */
+.pi-grid { display: flex; gap: 8px; }
+.pi-grid-dual  .pi-card { flex: 1; }
+.pi-grid-single .pi-card { width: 100%; }
+
+.pi-card {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 8px;
+  border-radius: 12px;
+  text-align: center;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s;
 }
-.pi-method + .pi-method {
-  border-top: 1px solid #c8e6c9;
-  margin-top: 6px;
-  padding-top: 6px;
+.pi-card:active { transform: scale(0.97); }
+
+.pi-card-cash {
+  background: #fff;
+  border: 2px solid #4caf50;
+  color: #2e7d32;
 }
+.pi-card-instapay {
+  background: #1565c0;
+  border: 2px solid #1565c0;
+  color: #fff;
+}
+
+.pi-card-icon { font-size: 28px; line-height: 1; margin-bottom: 4px; }
+.pi-card-img  { width: 36px; height: 36px; border-radius: 8px; display: block; margin: 0 auto; }
+.pi-card-label { font-size: 15px; font-weight: 800; }
+.pi-card-detail { font-size: 11px; margin-top: 2px; opacity: 0.85; }
+.pi-card-instapay .pi-card-detail { opacity: 0.9; }
 
 /* ── Super manager: login ────────────────────────────────────── */
 /* Re-uses existing .login-wrap / .login-icon / .login-title styles */
@@ -465,29 +489,6 @@
    the menu so the last item can scroll clear of the bar, including the taller
    state when the "مسح الكل" button is visible plus the phone's home indicator. */
 #menuContainer { margin-bottom: calc(180px + env(safe-area-inset-bottom, 0px)); }
-/* ── InstaPay tappable link button ────────────────────────────── */
-.instapay-link-btn {
-  display: block;
-  width: 100%;
-  padding: 10px 16px;
-  margin-top: 4px;
-  background: #1565c0;
-  color: #fff;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 800;
-  text-align: center;
-  text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
-}
-.instapay-link-btn:active { background: #0d47a1; }
-.pi-instapay-hint {
-  font-size: 11px;
-  color: #666;
-  text-align: center;
-  margin-top: 6px;
-}
 
 /* Tighten the submitted screen so payment box + action buttons fit on screen */
 #screen-submitted .big-icon  { padding: 20px 0 6px; font-size: 48px; }
