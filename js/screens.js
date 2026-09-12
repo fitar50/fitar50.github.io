@@ -206,7 +206,7 @@ function renderSubmittedScreen() {
 
   const submitTime = loadSubmitTime(S.currentName);
   const subLabel = document.getElementById('subLabel');
-  subLabel.textContent = submitTime ? `تم حفظ طلبك — ${submitTime}` : 'تم حفظ طلبك بنجاح!';
+  subLabel.textContent = submitTime ? 'تم حفظ طلبك — ' + submitTime : 'تم حفظ طلبك بنجاح!';
 
   const order     = S.orders.find(o => normAr(o.name) === normAr(S.currentName));
   const items     = order ? order.items : [];
@@ -219,32 +219,25 @@ function renderSubmittedScreen() {
   const delShare = S.deliveryFee / people;
   const grand    = foodTotal + delShare;
 
-  document.getElementById('subList').innerHTML = items.map(i => `
-    <div class="summary-row">
-      <span>
-        <span class="qty-tag">×${i.qty}</span>${h(i.name)}
-        ${i.note ? `<span class="summary-note">📝 ${h(i.note)}</span>` : ''}
-      </span>
-      <span>${i.price * i.qty} جنيه</span>
-    </div>`).join('');
+  document.getElementById('subList').innerHTML = items.map(i =>
+    '<div class="sub-item"><span><span class="qty-tag">×' + i.qty + '</span>' + h(i.name) +
+    (i.note ? ' <span class="sub-note">📝 ' + h(i.note) + '</span>' : '') +
+    '</span><span>' + (i.price * i.qty) + ' ج</span></div>'
+  ).join('');
 
-  const delNote = people <= 1
-    ? `<span class="note-alert">⚠️ لسه محدش طلب غيرك — التوصيل هيقل لما يزودوا</span>`
-    : `<span class="note">قد يتغير لو اضاف ناس بعدين</span>`;
+  var delWarn = people <= 1
+    ? '<div class="sub-del-warn">⚠️ لسه محدش طلب غيرك — التوصيل هيقل لما يزودوا</div>'
+    : '';
 
-  document.getElementById('subTotalBox').innerHTML = `
-    <div class="total-box">
-      <div class="trow"><span>إجمالي الطعام</span><span>${foodTotal} جنيه</span></div>
-      <div class="trow">
-        <span>التوصيل (${people} أشخاص — تقريبي)</span>
-        <span>${fmtNum(delShare)} جنيه</span>
-      </div>
-      <div style="padding:2px 0 4px;">${delNote}</div>
-      <div class="trow grand"><span>حسابك</span><span>${roundPersonTotal(grand)} جنيه</span></div>
-    </div>`;
+  document.getElementById('subTotalBox').innerHTML =
+    '<div class="sub-totals">' +
+    '<div class="sub-trow"><span>طعام</span><span>' + foodTotal + ' ج</span></div>' +
+    '<div class="sub-trow"><span>توصيل (' + people + ' أشخاص)</span><span>' + fmtNum(delShare) + ' ج</span></div>' +
+    delWarn +
+    '<div class="sub-trow sub-grand"><span>حسابك</span><span>' + roundPersonTotal(grand) + ' جنيه</span></div>' +
+    '</div>';
 
-  // Payment info box
-  const piBox = document.getElementById('subPaymentBox');
+  var piBox = document.getElementById('subPaymentBox');
   if (piBox) piBox.innerHTML = _buildPaymentBox();
 
   showScreen('screen-submitted');

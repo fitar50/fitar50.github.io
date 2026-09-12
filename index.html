@@ -101,21 +101,25 @@
 <!-- ======================== SUBMITTED SCREEN ======================== -->
 <div id="screen-submitted" class="screen">
   <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
-  <div class="big-icon">✅</div>
-  <p class="sub-name" id="subName"></p>
-  <p class="sub-label" id="subLabel">تم حفظ طلبك بنجاح!</p>
-  <div class="card" style="margin-bottom:12px;">
-    <div style="padding:14px 16px 4px;" id="subList"></div>
+  <!-- Compact hero: icon + name + time in one row -->
+  <div class="sub-hero">
+    <span class="sub-hero-icon">✅</span>
+    <div class="sub-hero-text">
+      <span class="sub-hero-name" id="subName"></span>
+      <span class="sub-hero-time" id="subLabel">تم حفظ طلبك بنجاح!</span>
+    </div>
   </div>
+  <div class="sub-items-card" id="subList"></div>
   <div id="subTotalBox"></div>
-  <!-- Payment info (populated by renderSubmittedScreen) -->
   <div id="subPaymentBox"></div>
-  <div class="act-row" style="margin-top:12px;">
-    <button class="btn btn-outline" data-action="editMyOrder">✏️ تعديل طلبي</button>
-    <button class="btn btn-outline" data-action="orderForAnother">➕ اطلب لشخص آخر</button>
-    <button class="btn btn-red" id="cancelOrderBtn" data-action="cancelMyOrder">🚫 إلغاء طلبي</button>
+  <div class="sub-actions">
+    <button class="btn btn-outline sub-act-btn" data-action="editMyOrder">✏️ تعديل</button>
+    <button class="btn btn-outline sub-act-btn" data-action="orderForAnother">➕ اطلب لحد تاني</button>
   </div>
-  <a class="back-link mgr-entry-link" data-action="goBackToName">← تغيير الاسم</a>
+  <div class="sub-bottom-row">
+    <a class="sub-link" data-action="cancelMyOrder" id="cancelOrderBtn">🚫 إلغاء طلبي</a>
+    <a class="sub-link" data-action="goBackToName">← تغيير الاسم</a>
+  </div>
 </div>
 
 <!-- ==================== REPEAT (same as last time?) ==================== -->
