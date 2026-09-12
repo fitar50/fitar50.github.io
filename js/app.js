@@ -375,6 +375,11 @@ document.addEventListener('click', e => {
     // Closed screen
     case 'lookupClosedOrder': lookupClosedOrder(); break;
 
+    // Payment card
+    case 'cashTap':
+      showToast('بتضغط على الزرار متوقع اني اجي اخد الفلوس يعني ولا ايه؟ مش فاهم 😂');
+      break;
+
     // Manager login
     case 'doManagerLogin': doManagerLogin(); break;
     case 'showMgrLogin':   renderManagerLogin(); break;

@@ -255,15 +255,11 @@ function _buildPaymentBox() {
   if (!pi || !pi.collectorName) return '';
   if (!pi.paymentCash && !pi.paymentInstapay) return '';
 
-  // Inline InstaPay-style icon (teal gradient rounded square with checkmark)
-  const ipIcon = '<img class="pi-card-img" alt="InstaPay" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+CiAgPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMjZDNkRBIi8+CiAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMwMDg5N0IiLz4KICA8L2xpbmVhckdyYWRpZW50PjwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHJ4PSIxMiIgZmlsbD0idXJsKCNnKSIvPgogIDxwYXRoIGQ9Ik0xNCAyNGw3IDcgMTMtMTQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGZpbGw9Im5vbmUiLz4KPC9zdmc+Cg==">';
-
   const cards = [];
 
   if (pi.paymentCash) {
-    cards.push(`<div class="pi-card pi-card-cash">
-      <div class="pi-card-icon">💵</div>
-      <div class="pi-card-label">كاش</div>
+    cards.push(`<div class="pi-card pi-card-cash" data-action="cashTap">
+      <div class="pi-card-label">💵 كاش</div>
       <div class="pi-card-detail">ادفع ل ${h(pi.collectorName)}</div>
     </div>`);
   }
@@ -272,14 +268,12 @@ function _buildPaymentBox() {
     const isLink = /^https?:\/\//i.test(pi.instapayNumber.trim());
     if (isLink) {
       cards.push(`<a href="${h(pi.instapayNumber.trim())}" target="_blank" rel="noopener" class="pi-card pi-card-instapay">
-        <div class="pi-card-icon">${ipIcon}</div>
-        <div class="pi-card-label">InstaPay</div>
+        <div class="pi-card-label">📲 InstaPay</div>
         <div class="pi-card-detail">اضغط هيفتح التطبيق</div>
       </a>`);
     } else {
       cards.push(`<div class="pi-card pi-card-instapay">
-        <div class="pi-card-icon">${ipIcon}</div>
-        <div class="pi-card-label">InstaPay</div>
+        <div class="pi-card-label">📲 InstaPay</div>
         <div class="pi-card-detail" dir="ltr">${h(pi.instapayNumber)}</div>
       </div>`);
     }
