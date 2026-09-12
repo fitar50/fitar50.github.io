@@ -104,6 +104,7 @@ window.addEventListener('popstate', function () {
       S.currentQty = {};
       S.isDirty    = false;
       S.orderedBy  = null;
+      _clearRememberedUser();
       if (S.isLocked) renderClosedScreen(S.currentName);
       else             renderNameScreen();
       break;
