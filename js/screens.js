@@ -287,7 +287,7 @@ function _buildPaymentBox() {
 /* ---------- CLOSED SCREEN ---------- */
 function renderClosedScreen(selectedName) {
   document.getElementById('closedTime').textContent =
-    S.lockTime ? `تم الإرسال الساعة ${S.lockTime}` : 'تم الإرسال للمطعم';
+    S.lockTime ? `تم الإرسال الساعة ${S.lockTime}` : 'الأوردر اتبعت للمطعم';
 
   fillNameDropdown('closedNameSelect', true);
 
