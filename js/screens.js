@@ -253,13 +253,6 @@ function _buildPaymentBox() {
 
   const cards = [];
 
-  if (pi.paymentCash) {
-    cards.push(`<div class="pi-card pi-card-cash" data-action="cashTap">
-      <div class="pi-card-label">💵 كاش</div>
-      <div class="pi-card-detail">ادفع ل ${h(pi.collectorName)}</div>
-    </div>`);
-  }
-
   if (pi.paymentInstapay && pi.instapayNumber) {
     const isLink = /^https?:\/\//i.test(pi.instapayNumber.trim());
     const ipLogo = '<img class="pi-ip-logo" alt="" src="./icons/instapay.png">';
@@ -277,7 +270,13 @@ function _buildPaymentBox() {
       </div>`);
     }
   }
-
+if (pi.paymentCash) {
+    cards.push(`<div class="pi-card pi-card-cash" data-action="cashTap">
+      <div class="pi-card-label">💵 كاش</div>
+      <div class="pi-card-detail">ادفع ل ${h(pi.collectorName)}</div>
+    </div>`);
+  }
+  
   const gridClass = cards.length === 1 ? 'pi-grid-single' : 'pi-grid-dual';
 
   return `
