@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitar Debug</title>
+<style>
+  body { font-family: monospace; padding: 16px; background: #111; color: #0f0; }
+  h2 { color: #ff0; }
+  button { margin: 8px 0; padding: 10px 16px; font-size: 14px; cursor: pointer; display: block; width: 100%; }
+  .ok { color: #0f0; } .err { color: #f55; } .warn { color: #ff0; }
+  pre { background: #222; padding: 10px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+</style>
+</head>
+<body>
+<h2>🔧 Fitar Debug</h2>
+
+<button onclick="checkAll()">▶ Run All Checks</button>
+<button onclick="clearAllCaches()">🗑 Clear ALL Caches</button>
+<button onclick="unregisterSW()">❌ Unregister Service Worker</button>
+<button onclick="hardReload()">🔄 Hard Reload App</button>
+
+<pre id="out">Press "Run All Checks"...</pre>
+
+<script src="js/config.js" onerror="log('❌ config.js FAILED TO LOAD','err')"></script>
+<script>
+const out = document.getElementById('out');
+let lines = [];
+
+function log(msg, cls) {
+  lines.push(`<span class="${cls||''}">${msg}</span>`);
+  out.innerHTML = lines.join('\n');
+}
+
+async function checkAll() {
+  lines = [];
+  log('=== SW Status ===');
+  if (!('serviceWorker' in navigator)) {
+    log('❌ Service Worker not supported', 'err'); 
+  } else {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    if (!regs.length) {
+      log('⚠ No SW registered', 'warn');
+    } else {
+      for (const r of regs) {
+        const sw = r.active || r.installing || r.waiting;
+        log(`✓ SW registered: ${r.scope}`);
+        log(`  state: ${sw ? sw.state : 'none'}`);
+      }
+    }
+    const keys = await caches.keys();
+    log(`Cache versions: ${keys.join(', ') || 'none'}`);
+  }
+
+  log('');
+  log('=== Config ===');
+  if (typeof RAILWAY_URL !== 'undefined') {
+    log(`✓ RAILWAY_URL = ${RAILWAY_URL}`, 'ok');
+  } else {
+    log('❌ RAILWAY_URL is UNDEFINED — config.js not loaded!', 'err');
+  }
+
+  log('');
+  log('=== Missing Functions ===');
+  const fns = ['renderNotOpenScreen','renderErrorScreen','renderNameScreen',
+                'loadSubmitTime','saveSubmitTime','showScreen','api','initLoad'];
+  fns.forEach(fn => {
+    if (typeof window[fn] === 'function') {
+      log(`✓ ${fn}`, 'ok');
+    } else {
+      log(`❌ ${fn} — MISSING`, 'err');
+    }
+  });
+
+  log('');
+  log('=== API Test ===');
+  if (typeof RAILWAY_URL !== 'undefined') {
+    try {
+      const r = await fetch(RAILWAY_URL + '/health');
+      const d = await r.json();
+      log(`✓ /health → ${JSON.stringify(d)}`, 'ok');
+    } catch(e) {
+      log(`❌ /health failed: ${e.message}`, 'err');
+    }
+    try {
+      const r = await fetch(RAILWAY_URL + '/api', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({action:'getAll'})
+      });
+      const d = await r.json();
+      log(`✓ getAll → success:${d.success}, orderingOpen:${d.orderingOpen}, names:${d.names?.length}`, 'ok');
+    } catch(e) {
+      log(`❌ getAll failed: ${e.message}`, 'err');
+    }
+  } else {
+    log('⏭ Skipped (RAILWAY_URL missing)', 'warn');
+  }
+}
+
+async function clearAllCaches() {
+  const keys = await caches.keys();
+  await Promise.all(keys.map(k => caches.delete(k)));
+  log(`🗑 Deleted caches: ${keys.join(', ') || 'none (already clean)'}`, 'ok');
+}
+
+async function unregisterSW() {
+  const regs = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(regs.map(r => r.unregister()));
+  log(`❌ Unregistered ${regs.length} service worker(s)`, 'warn');
+}
+
+function hardReload() {
+  window.location.href = 'https://fitar50.github.io/?' + Date.now();
+}
+</script>
+<!-- Load other scripts so we can check if functions exist -->
+<script src="js/utils.js" onerror="log('❌ utils.js failed','err')"></script>
+<script src="js/api.js" onerror="log('❌ api.js failed','err')"></script>
+<script src="js/screens.js" onerror="log('❌ screens.js failed','err')"></script>
+<script src="js/manager.js" onerror="log('❌ manager.js failed','err')"></script>
+<script src="js/app.js" onerror="log('❌ app.js failed','err')"></script>
+</body>
+</html>

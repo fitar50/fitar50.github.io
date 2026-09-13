@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فطار الشغل 🥙</title>
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+<!-- ======================== LOADING ======================== -->
+<div id="screen-loading" class="screen active">
+  <div class="spinner"></div>
+  <p style="color:var(--grey);font-size:14px;">جاري التحميل...</p>
+</div>
+
+<!-- ======================== ERROR / RETRY ======================== -->
+<div id="screen-error" class="screen">
+  <div class="error-screen">
+    <div class="e-icon">📡</div>
+    <h2>فشل الاتصال</h2>
+    <p>تأكد من الإنترنت وحاول تاني</p>
+    <button class="btn btn-primary" data-action="retryInit" style="max-width:200px;">🔄 إعادة المحاولة</button>
+  </div>
+</div>
+
+<!-- ======================== NOT OPEN SCREEN ======================== -->
+<div id="screen-not-open" class="screen">
+  <div class="hdr">
+    <h1>🥙 فطار الشغل</h1>
+    <p>صباح الخير!</p>
+  </div>
+  <div class="not-open-screen">
+    <div class="not-open-icon">⏳</div>
+    <h2 class="not-open-title">الطلبات ما اتفتحتش لسه</h2>
+    <p class="not-open-sub">لما المدير يفتح الطلبات<br>هتقدر تختار اللي تطلبه 🥙</p>
+  </div>
+  <a class="back-link mgr-entry-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+</div>
+
+<!-- ======================== NAME SCREEN ======================== -->
+<div id="screen-name" class="screen">
+  <div class="hdr">
+    <h1>🥙 فطار الشغل</h1>
+    <p>اختار اسمك وابدأ الطلب</p>
+  </div>
+  <div id="orderingForBanner" style="display:none;margin:14px 14px 0;background:#fff3e0;color:#e65100;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;text-align:center;border:1.5px solid #ffcc80;"></div>
+
+  <div id="orderCounter" class="order-counter" style="display:none;"></div>
+
+  <div class="name-hero">
+    <span class="emoji">🧆</span>
+    <h2>صباح الخير!</h2>
+    <p>اختار اسمك من القايمة</p>
+  </div>
+  <div class="card">
+    <div class="name-body">
+      <label class="field-label">اسمك</label>
+      <div class="name-row">
+        <div class="sel-wrap" style="flex:1;">
+          <select id="nameSelect">
+            <option value="">-- اختار --</option>
+          </select>
+        </div>
+        <button class="edit-name-btn" id="editNameBtn" title="تعديل الاسم" style="display:none;" data-action="promptEditName">✏️</button>
+      </div>
+
+      <!-- Inline name-edit input -->
+      <div id="editNameWrap" style="display:none;margin-bottom:12px;">
+        <label class="field-label">الاسم الجديد</label>
+        <div class="edit-name-row">
+          <input type="text" id="editNameInput" maxlength="30">
+          <button class="btn btn-primary edit-name-save" data-action="saveEditName">حفظ ✓</button>
+          <button class="btn btn-outline edit-name-cancel" data-action="cancelEditName">إلغاء</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" data-action="proceedWithName" style="margin-top:12px;">متابعة ←</button>
+    </div>
+  </div>
+  <a class="back-link mgr-entry-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+</div>
+
+<!-- ======================== ORDER SCREEN ======================== -->
+<div id="screen-order" class="screen">
+  <div class="hdr" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;">
+    <button data-action="goBackToName" style="background:none;border:2px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:inherit;flex-shrink:0;">← رجوع</button>
+    <div style="flex:1;text-align:center;">
+      <h1 id="orderTitle">اختار طلبك 🥙</h1>
+      <p id="orderSub" style="font-size:12px;opacity:0.85;margin-top:3px;">اختار من القايمة اللي تحبها</p>
+    </div>
+    <div style="width:72px;"></div>
+  </div>
+  <div class="card" id="menuContainer"></div>
+  <div class="sticky-foot">
+    <div class="total-bar">
+      <span>إجمالي طلبك:</span>
+      <strong id="orderTotal">0 جنيه</strong>
+    </div>
+    <button id="clearOrderBtn" class="btn" data-action="clearOrder" style="display:none;background:#fff0f0;color:#c62828;border:1.5px solid #ffcdd2;margin-bottom:8px;font-size:13px;padding:10px;">🗑 مسح الكل</button>
+    <button class="btn btn-primary" id="submitBtn" data-action="submitOrder" disabled>
+      تأكيد الطلب ✓
+    </button>
+  </div>
+</div>
+
+<!-- ======================== SUBMITTED SCREEN ======================== -->
+<div id="screen-submitted" class="screen">
+  <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
+  <div class="big-icon">✅</div>
+  <p class="sub-name" id="subName"></p>
+  <p class="sub-label" id="subLabel">تم حفظ طلبك بنجاح!</p>
+  <div class="card" style="margin-bottom:12px;">
+    <div style="padding:14px 16px 4px;" id="subList"></div>
+  </div>
+  <div id="subTotalBox"></div>
+  <div class="act-row" style="margin-top:12px;">
+    <button class="btn btn-outline" data-action="editMyOrder">✏️ تعديل طلبي</button>
+    <button class="btn btn-outline" data-action="orderForAnother">➕ اطلب لشخص آخر</button>
+    <button class="btn btn-red" id="cancelOrderBtn" data-action="cancelMyOrder">🚫 إلغاء طلبي</button>
+  </div>
+  <a class="back-link mgr-entry-link" data-action="goBackToName">← تغيير الاسم</a>
+</div>
+
+<!-- ======================== CLOSED SCREEN ======================== -->
+<div id="screen-closed" class="screen">
+  <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
+  <div class="lock-icon">🔒</div>
+  <p class="lock-title">الطلبات اتبعتت!</p>
+  <p class="lock-sub" id="closedTime"></p>
+
+  <div id="closedHasOrder" style="display:none;">
+    <div class="section-title">طلبك</div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="padding:14px 16px 4px;" id="closedList"></div>
+    </div>
+    <div id="closedTotalBox"></div>
+  </div>
+
+  <div id="closedNoOrder">
+    <div class="card">
+      <div class="empty">
+        <div class="e-icon">🔍</div>
+        <p class="lock-title">اختار اسمك عشان تشوف طلبك وكام هتدفع</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px;">
+      <div class="name-body">
+        <label class="field-label">اسمك</label>
+        <div class="sel-wrap">
+          <select id="closedNameSelect">
+            <option value="">-- اختار --</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+  <a class="back-link mgr-entry-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+</div>
+
+<!-- ======================== MANAGER LOGIN ======================== -->
+<div id="screen-mgr-login" class="screen">
+  <div class="hdr hdr-dark"><h1>🔑 لوحة التحكم</h1></div>
+  <div class="login-wrap">
+    <div class="login-icon">👨‍💼</div>
+    <p class="login-title">دخول المدير</p>
+    <p class="login-sub">ادخل كود التحقق الخاص بيك</p>
+    <div class="form-group">
+      <label class="field-label">كود التحقق</label>
+      <input type="password" id="mgrCodeInput" placeholder="• • • • • •">
+    </div>
+    <button class="btn btn-primary" data-action="doManagerLogin">دخول</button>
+    <a class="back-link" data-action="exitManager">← رجوع لصفحة الطلب</a>
+  </div>
+</div>
+
+<!-- ======================== MANAGER DASHBOARD ======================== -->
+<div id="screen-manager" class="screen">
+  <div class="hdr hdr-dark" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;">
+    <button data-action="exitManager" style="background:none;border:2px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:inherit;">← خروج</button>
+    <h1 style="flex:1;text-align:center;">📋 لوحة المدير</h1>
+    <div style="width:72px;"></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-val" id="sPeople">0</div><div class="stat-lbl">أشخاص</div></div>
+    <div class="stat"><div class="stat-val" id="sFood">0</div><div class="stat-lbl">طعام ج</div></div>
+    <div class="stat"><div class="stat-val" id="sTotal">0</div><div class="stat-lbl">الإجمالي ج</div></div>
+  </div>
+
+  <div class="refresh-row">
+    <span class="last-updated" id="lastUpdated"></span>
+    <button class="refresh-btn" data-action="refreshManager">🔄 تحديث</button>
+  </div>
+
+  <!-- Total order summary -->
+  <div class="section-title">ملخص الطلب الكلي (للمطعم)</div>
+  <div class="total-summary" id="totalSummary"></div>
+
+  <!-- Per-person orders -->
+  <div class="section-title">طلبات الأشخاص</div>
+  <div id="ordersList"></div>
+
+  <!-- Add order for person (manager only) -->
+  <div class="section-title">إضافة طلب لشخص</div>
+  <div class="add-person-card">
+    <div class="sel-wrap"><select id="mgrPersonSel"><option value="">-- اختار اسم --</option></select></div>
+    <button class="inline-btn" data-action="mgrAddPerson" style="width:100%;margin-top:0;">➕ فتح الطلب</button>
+  </div>
+
+  <!-- Names management (manager only) -->
+  <div class="section-title">إدارة الأسماء</div>
+  <div class="card" id="namesMgmtList" style="margin:0 14px;padding:0;"></div>
+  <!-- Add new name input (manager only) -->
+  <div class="add-name-card">
+    <input type="text" id="mgrNewNameInput" placeholder="اسم جديد" maxlength="30">
+    <button class="inline-btn" data-action="mgrAddName">➕ إضافة اسم</button>
+  </div>
+
+  <!-- Actions -->
+  <div class="section-title">إجراءات</div>
+  <div class="mgr-actions" id="mgrActions">
+    <button class="btn btn-green" id="lockBtn" data-action="doLock">🔒 قفل الطلبات وإرسال للمطعم</button>
+    <button class="btn btn-red" data-action="doReset">🔄 تصفير الطلبات</button>
+  </div>
+</div>
+
+<!-- ======================== EDIT MODAL ======================== -->
+<div id="editModal">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3 id="modalTitle">تعديل الطلب</h3>
+      <button class="modal-close" data-action="closeModal">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" id="modalSaveBtn" data-action="saveModal">حفظ التعديلات ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== CONFIRM SHEET ======================== -->
+<div id="confirmModal">
+  <div class="confirm-sheet">
+    <p id="confirmMessage" class="confirm-msg"></p>
+    <div class="confirm-btns">
+      <button class="btn btn-outline" data-action="cancelConfirm">لا، إلغاء</button>
+      <button class="btn btn-primary" data-action="doConfirm">تأكيد ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+</div><!-- #app -->
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/api.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/manager.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
