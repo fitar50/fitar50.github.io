@@ -101,10 +101,11 @@ window.addEventListener('popstate', function () {
   switch (from) {
     case 'screen-order':
     case 'screen-submitted':
+    case 'screen-repeat':
       S.currentQty = {};
       S.isDirty    = false;
       S.orderedBy  = null;
-      _clearRememberedUser();
+      _clearRememberedUser(); // defined in app.js, available at runtime
       if (S.isLocked) renderClosedScreen(S.currentName);
       else             renderNameScreen();
       break;

@@ -229,16 +229,19 @@ function renderSubmittedScreen() {
     ? '<div class="sub-del-warn">⚠️ لسه محدش طلب غيرك — التوصيل هيقل لما يزودوا</div>'
     : '';
 
+  var delRow = S.deliveryFee > 0
+    ? '<div class="sub-trow"><span>توصيل (' + people + ' أشخاص)</span><span>' + fmtNum(delShare) + ' ج</span></div>' + delWarn
+    : '';
+
   document.getElementById('subTotalBox').innerHTML =
     '<div class="sub-totals">' +
     '<div class="sub-trow"><span>طعام</span><span>' + foodTotal + ' ج</span></div>' +
-    '<div class="sub-trow"><span>توصيل (' + people + ' أشخاص)</span><span>' + fmtNum(delShare) + ' ج</span></div>' +
-    delWarn +
+    delRow +
     '<div class="sub-trow sub-grand"><span>حسابك</span><span>' + roundPersonTotal(grand) + ' جنيه</span></div>' +
     '</div>';
 
   var piBox = document.getElementById('subPaymentBox');
-  if (piBox) piBox.innerHTML = _buildPaymentBox();
+  if (piBox) piBox.innerHTML = S.isLocked ? _buildPaymentBox() : '';
 
   showScreen('screen-submitted');
 }
@@ -249,6 +252,13 @@ function _buildPaymentBox() {
   if (!pi.paymentCash && !pi.paymentInstapay) return '';
 
   const cards = [];
+
+  if (pi.paymentCash) {
+    cards.push(`<div class="pi-card pi-card-cash" data-action="cashTap">
+      <div class="pi-card-label">💵 كاش</div>
+      <div class="pi-card-detail">ادفع ل ${h(pi.collectorName)}</div>
+    </div>`);
+  }
 
   if (pi.paymentInstapay && pi.instapayNumber) {
     const isLink = /^https?:\/\//i.test(pi.instapayNumber.trim());
@@ -268,13 +278,6 @@ function _buildPaymentBox() {
     }
   }
 
-if (pi.paymentCash) {
-    cards.push(`<div class="pi-card pi-card-cash" data-action="cashTap">
-      <div class="pi-card-label">💵 كاش</div>
-      <div class="pi-card-detail">ادفع ل ${h(pi.collectorName)}</div>
-    </div>`);
-  }
-  
   const gridClass = cards.length === 1 ? 'pi-grid-single' : 'pi-grid-dual';
 
   return `
@@ -287,7 +290,7 @@ if (pi.paymentCash) {
 /* ---------- CLOSED SCREEN ---------- */
 function renderClosedScreen(selectedName) {
   document.getElementById('closedTime').textContent =
-    S.lockTime ? `تم الإرسال الساعة ${S.lockTime}` : 'الأوردر اتبعت للمطعم';
+    S.lockTime ? `تم الإرسال الساعة ${S.lockTime}` : 'تم الإرسال للمطعم';
 
   fillNameDropdown('closedNameSelect', true);
 

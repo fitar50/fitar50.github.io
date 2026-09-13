@@ -46,178 +46,220 @@ const S = {
 };
 
 // ================================================================
-// USER STATUS POLL
+// REAL-TIME UPDATES (SSE with polling fallback)
 // ================================================================
+let _eventSource   = null;
 let _userPollTimer = null;
+let _sseRetries    = 0;
 
-function startUserPoll() {
+function startLiveUpdates() {
+  if (_eventSource || _userPollTimer) return;
+  // Try SSE first; fall back to polling if it fails
+  _trySSE();
+}
+
+function stopLiveUpdates() {
+  if (_eventSource) { _eventSource.close(); _eventSource = null; }
+  if (_userPollTimer) { clearInterval(_userPollTimer); _userPollTimer = null; }
+}
+
+// Legacy aliases so existing call-sites (manager.js, etc.) keep working
+function startUserPoll() { startLiveUpdates(); }
+function stopUserPoll()  { stopLiveUpdates(); }
+
+function _trySSE() {
+  if (_eventSource) return;
+  try {
+    _eventSource = new EventSource(RAILWAY_URL + '/api/events');
+    _eventSource.onmessage = function (e) {
+      _sseRetries = 0;
+      try { _handleStatusUpdate(JSON.parse(e.data)); } catch (err) {}
+    };
+    _eventSource.onerror = function () {
+      _eventSource.close();
+      _eventSource = null;
+      _sseRetries++;
+      if (_sseRetries < 3) {
+        // Retry SSE after a short backoff
+        setTimeout(_trySSE, 3000 * _sseRetries);
+      } else {
+        // Give up on SSE, fall back to polling
+        _startPollFallback();
+      }
+    };
+    // SSE is open; stop any active poll
+    if (_userPollTimer) { clearInterval(_userPollTimer); _userPollTimer = null; }
+  } catch (e) {
+    _startPollFallback();
+  }
+}
+
+function _startPollFallback() {
   if (_userPollTimer) return;
   _userPollTimer = setInterval(async () => {
-    const active   = document.querySelector('.screen.active');
-    const screenId = active ? active.id : null;
-    // screen-closed is included on purpose: money changes hands AFTER locking,
-    // so that is exactly when a collector change has to reach people.
-    const relevant = ['screen-name', 'screen-order', 'screen-submitted', 'screen-not-open', 'screen-closed', 'screen-repeat'];
-    if (!relevant.includes(screenId)) return;
-
     try {
       const r = await api('getStatus');
-
-      if (r.locked && !S.isLocked) {
-        S.isLocked = true;
-        S.lockTime = r.lockTime;
-        // Poll deliberately keeps running: see the screen-closed cases below.
-        showToast('🔒 الطلبات اتقفلت!');
-        api('getOrders')
-          .then(fresh => { if (fresh && fresh.data) S.orders = fresh.data; })
-          .catch(() => {})
-          .finally(() => setTimeout(() => renderClosedScreen(S.currentName), 400));
-        return;
-      }
-
-      // The day was reset (or unlocked) while the user was on the closed screen.
-      // Without this they keep staring at yesterday's order and its totals.
-      if (!r.locked && S.isLocked) {
-        S.currentName = null;
-        S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
-        S.isDirty = false;
-        // Full refetch, not just orders: a reset must also refresh lastOrders
-        // (the "same as last time?" prompt), the menu and names, on already-open
-        // clients that never reloaded. Without this S.lastOrders stays whatever
-        // it was at page load (usually empty) and the repeat prompt never shows.
-        const ok = await initLoad();
-        // getStatus (r) is authoritative for this poll cycle; initLoad is only to
-        // refresh menu/names/lastOrders/orders. Re-apply the flags either way.
-        S.isLocked = false;
-        S.lockTime = '';
-        S.orderingOpen = r.orderingOpen === true;
-        if (!ok) { /* offline: keep whatever data we had, flags above still apply */ }
-        showToast('اتعمل تصفير — يوم جديد');
-        if (S.orderingOpen) renderNameScreen(); else renderNotOpenScreen();
-        return;
-      }
-
-      if (r.orderingOpen === true && !S.orderingOpen && screenId === 'screen-not-open') {
-        S.orderingOpen = true;
-        // Refresh menu, names and lastOrders before ordering starts, so the
-        // "same as last time?" prompt has current data on already-open clients.
-        await initLoad();
-        S.orderingOpen = true;
-
-        // If this browser remembers a user, skip straight to ordering for them
-        // instead of showing the name selection screen.
-        const rem = _loadRememberedUser();
-        if (rem && S.names.some(n => normAr(n) === normAr(rem))) {
-          S.currentName = S.names.find(n => normAr(n) === normAr(rem)) || rem;
-          const ex = S.orders.find(o => normAr(o.name) === normAr(S.currentName));
-          if (ex) {
-            S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
-            ex.items.forEach(i => {
-              S.currentQty[i.name] = (S.currentQty[i.name] || 0) + i.qty;
-              if (i.note) { S.currentNotes[i.name] = i.note; S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty; }
-            });
-            renderSubmittedScreen();
-          } else {
-            const last = _lastOrderFor(S.currentName);
-            const rItems = (last || [])
-              .filter(i => S.menuFlat.some(f => f.name === i.name))
-              .map(i => ({ name: i.name, qty: i.qty, note: i.note, price: findPrice(i.name) }));
-            if (rItems.length) renderRepeatScreen(S.currentName, rItems);
-            else                renderOrderScreen(S.currentName);
-          }
-          return;
-        }
-
-        renderNameScreen();
-        return;
-      }
-
-      // Ordering closed while the user is still here. This also covers a
-      // manager reset, which deletes every order: without the screen-submitted
-      // case the user keeps staring at an order that no longer exists and
-      // believes their breakfast is on the way.
-      // screen-order is deliberately excluded: kicking them out would destroy
-      // in-progress selections, and submitOrder already redirects on failure.
-      if (r.orderingOpen === false && S.orderingOpen &&
-          ['screen-name', 'screen-submitted', 'screen-repeat'].includes(screenId)) {
-        S.orderingOpen = false;
-        const orderGone = screenId === 'screen-submitted' &&
-          !(r.ordersCount > 0 && S.orders.some(o => normAr(o.name) === normAr(S.currentName)));
-        S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
-        S.isDirty = false;
-        showToast(orderGone ? 'اتعمل تصفير للطلبات — طلبك اتمسح' : 'الطلبات اتقفلت مؤقتاً');
-        renderNotOpenScreen();
-        return;
-      }
-
-      S.orderingOpen = r.orderingOpen === true;
-
-      // Delivery fee is server-driven (restaurant fee, or the manager's daily
-      // override). Apply before any re-render that shows the split.
-      if (typeof r.deliveryFee === 'number') S.deliveryFee = r.deliveryFee;
-
-      // Note suggestions now ride getStatus. Refresh them, and if the user is on
-      // the order screen, update the chips in place (never re-render the order
-      // screen: it would wipe in-progress quantities and typed notes).
-      if (r.noteSuggestions) {
-        const before = JSON.stringify(S.noteSuggestions || {});
-        S.noteSuggestions = r.noteSuggestions;
-        if (screenId === 'screen-order' && JSON.stringify(S.noteSuggestions) !== before) {
-          refreshNoteChips();
-        }
-      }
-
-      // Refresh the orders list when the server count moved, so the name
-      // dropdown ticks and the "طلب X من Y" counter stop going stale.
-      // Compare against _serverOrdersCount, NOT S.orders.length: the latter
-      // refetches forever when a name is deleted but its order remains.
-      if (typeof r.ordersCount === 'number') {
-        const countChanged = r.ordersCount !== S._serverOrdersCount;
-        S._serverOrdersCount = r.ordersCount;
-
-        if (countChanged) {
-          try {
-            const fresh = await api('getOrders');
-            if (fresh && fresh.data) {
-              S.orders = fresh.data;
-              // Only on the name screen. Re-rendering screen-order would wipe
-              // the user's in-progress quantities and notes.
-              if (screenId === 'screen-name') renderNameScreen();
-              // On the closed screen the delivery split changes if the manager
-              // removes an order, so the amount owed must be recomputed.
-              if (screenId === 'screen-closed' && S.currentName) {
-                const mine = S.orders.find(o => normAr(o.name) === normAr(S.currentName));
-                if (mine) renderClosedOrder(S.currentName, mine.items);
-                else      renderClosedScreen(null);
-              }
-            }
-          } catch (e) { /* ignore */ }
-        }
-      }
-
-      // Payment info can change mid-day (the collector might change). Re-render
-      // only the payment box, and only when it actually differs: calling
-      // renderSubmittedScreen() would scroll the user to the top, and rewriting
-      // identical HTML every 10s flickers on some Android browsers.
-      if (r.paymentInfo) {
-        const before  = JSON.stringify(S.paymentInfo);
-        S.paymentInfo = r.paymentInfo;
-        if (JSON.stringify(S.paymentInfo) !== before) {
-          if (screenId === 'screen-submitted') {
-            const box = document.getElementById('subPaymentBox');
-            if (box) box.innerHTML = _buildPaymentBox();
-          } else if (screenId === 'screen-closed') {
-            const box = document.getElementById('closedPaymentBox');
-            if (box) box.innerHTML = _buildPaymentBox();
-          }
-        }
-      }
-    } catch (e) { /* swallow */ }
+      _handleStatusUpdate(r);
+    } catch (e) {}
+    // Periodically attempt to upgrade back to SSE (e.g. after Railway wake)
+    if (!_eventSource && _sseRetries >= 3 && Math.random() < 0.15) {
+      _sseRetries = 0;
+      clearInterval(_userPollTimer);
+      _userPollTimer = null;
+      _trySSE();
+    }
   }, 10000);
 }
 
-function stopUserPoll() {
-  if (_userPollTimer) { clearInterval(_userPollTimer); _userPollTimer = null; }
+// Shared handler: processes a status payload from either SSE or poll.
+// Guarded against re-entrancy: if a slow handler (e.g. initLoad on reset)
+// is still running, newer events are queued and the latest one wins.
+let _statusBusy = false;
+let _statusQueued = null;
+
+async function _handleStatusUpdate(r) {
+  if (_statusBusy) { _statusQueued = r; return; }
+  _statusBusy = true;
+  try {
+    await _processStatus(r);
+  } finally {
+    _statusBusy = false;
+    if (_statusQueued) {
+      var next = _statusQueued;
+      _statusQueued = null;
+      _handleStatusUpdate(next);
+    }
+  }
+}
+
+async function _processStatus(r) {
+  const active   = document.querySelector('.screen.active');
+  const screenId = active ? active.id : null;
+  const relevant = ['screen-name', 'screen-order', 'screen-submitted', 'screen-not-open', 'screen-closed', 'screen-repeat'];
+  if (!relevant.includes(screenId)) return;
+
+  // ── Lock ──────────────────────────────────────────────────────
+  if (r.locked && !S.isLocked) {
+    S.isLocked = true;
+    S.lockTime = r.lockTime;
+    if (r.paymentInfo) S.paymentInfo = r.paymentInfo;
+    showToast('\u{1F512} الطلبات اتقفلت!');
+    api('getOrders')
+      .then(function(fresh) { if (fresh && fresh.data) S.orders = fresh.data; })
+      .catch(function(){})
+      .finally(function() { setTimeout(function() { renderClosedScreen(S.currentName); }, 400); });
+    return;
+  }
+
+  // ── Reset (unlock) ────────────────────────────────────────────
+  if (!r.locked && S.isLocked) {
+    S.currentName = null;
+    S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
+    S.isDirty = false;
+    var ok2 = await initLoad();
+    S.isLocked = false;
+    S.lockTime = '';
+    S.orderingOpen = r.orderingOpen === true;
+    if (!ok2) {}
+    showToast('اتعمل تصفير \u2014 يوم جديد');
+    if (S.orderingOpen) renderNameScreen(); else renderNotOpenScreen();
+    return;
+  }
+
+  // ── Ordering just opened ──────────────────────────────────────
+  if (r.orderingOpen === true && !S.orderingOpen && screenId === 'screen-not-open') {
+    S.orderingOpen = true;
+    await initLoad();
+    S.orderingOpen = true;
+
+    var rem = _loadRememberedUser();
+    if (rem && S.names.some(function(n) { return normAr(n) === normAr(rem); })) {
+      S.currentName = S.names.find(function(n) { return normAr(n) === normAr(rem); }) || rem;
+      var ex = S.orders.find(function(o) { return normAr(o.name) === normAr(S.currentName); });
+      if (ex) {
+        S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
+        ex.items.forEach(function(i) {
+          S.currentQty[i.name] = (S.currentQty[i.name] || 0) + i.qty;
+          if (i.note) { S.currentNotes[i.name] = i.note; S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty; }
+        });
+        renderSubmittedScreen();
+      } else {
+        var last2 = _lastOrderFor(S.currentName);
+        var rItems = (last2 || [])
+          .filter(function(i) { return S.menuFlat.some(function(f) { return f.name === i.name; }); })
+          .map(function(i) { return { name: i.name, qty: i.qty, note: i.note, price: findPrice(i.name) }; });
+        if (rItems.length) renderRepeatScreen(S.currentName, rItems);
+        else                renderOrderScreen(S.currentName);
+      }
+      return;
+    }
+
+    renderNameScreen();
+    return;
+  }
+
+  // ── Ordering just closed ──────────────────────────────────────
+  if (r.orderingOpen === false && S.orderingOpen &&
+      ['screen-name', 'screen-submitted', 'screen-repeat'].includes(screenId)) {
+    S.orderingOpen = false;
+    var orderGone = screenId === 'screen-submitted' &&
+      !(r.ordersCount > 0 && S.orders.some(function(o) { return normAr(o.name) === normAr(S.currentName); }));
+    S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
+    S.isDirty = false;
+    showToast(orderGone ? 'اتعمل تصفير للطلبات \u2014 طلبك اتمسح' : 'الطلبات اتقفلت مؤقتاً');
+    renderNotOpenScreen();
+    return;
+  }
+
+  S.orderingOpen = r.orderingOpen === true;
+
+  // ── Delivery fee ──────────────────────────────────────────────
+  if (typeof r.deliveryFee === 'number') S.deliveryFee = r.deliveryFee;
+
+  // ── Note suggestions ──────────────────────────────────────────
+  if (r.noteSuggestions) {
+    var before = JSON.stringify(S.noteSuggestions || {});
+    S.noteSuggestions = r.noteSuggestions;
+    if (screenId === 'screen-order' && JSON.stringify(S.noteSuggestions) !== before) {
+      refreshNoteChips();
+    }
+  }
+
+  // ── Order count ───────────────────────────────────────────────
+  if (typeof r.ordersCount === 'number') {
+    var countChanged = r.ordersCount !== S._serverOrdersCount;
+    S._serverOrdersCount = r.ordersCount;
+
+    if (countChanged) {
+      try {
+        var fresh2 = await api('getOrders');
+        if (fresh2 && fresh2.data) {
+          S.orders = fresh2.data;
+          if (screenId === 'screen-name') renderNameScreen();
+          if (screenId === 'screen-closed' && S.currentName) {
+            var mine = S.orders.find(function(o) { return normAr(o.name) === normAr(S.currentName); });
+            if (mine) renderClosedOrder(S.currentName, mine.items);
+            else      renderClosedScreen(null);
+          }
+        }
+      } catch (e2) {}
+    }
+  }
+
+  // ── Payment info ──────────────────────────────────────────────
+  if (r.paymentInfo) {
+    var beforePi  = JSON.stringify(S.paymentInfo);
+    S.paymentInfo = r.paymentInfo;
+    if (JSON.stringify(S.paymentInfo) !== beforePi) {
+      if (screenId === 'screen-submitted') {
+        var box = document.getElementById('subPaymentBox');
+        if (box) box.innerHTML = S.isLocked ? _buildPaymentBox() : '';
+      } else if (screenId === 'screen-closed') {
+        var box2 = document.getElementById('closedPaymentBox');
+        if (box2) box2.innerHTML = _buildPaymentBox();
+      }
+    }
+  }
 }
 
 /* ---------- INIT ---------- */
@@ -291,6 +333,7 @@ async function init() {
     // ── No remembered user (or it was cleared) ────────────────────
 
     if (S.isLocked) {
+      startUserPoll();
       renderClosedScreen(null);
     } else if (!S.orderingOpen) {
       startUserPoll();
@@ -377,7 +420,7 @@ document.addEventListener('click', e => {
 
     // Payment card
     case 'cashTap':
-      showToast('بتضغط على الزرار متوقع اني اجي اخد الفلوس يعني ولا ايه؟');
+      showToast('بتضغط على الزرار متوقع اني اجي اخد الفلوس يعني ولا ايه؟ مش فاهم 😂');
       break;
 
     // Manager login
@@ -740,18 +783,24 @@ function _refreshNoteQtyDisplay(id, totalQty) {
 }
 
 /* ---------- ORDER SCREEN LOGIC ---------- */
-function handleCancelOrder(btn) {
+function handleCancelOrder(el) {
   if (!S.currentName) return;
   showConfirm('متأكد مش هتطلب النهارده؟ الطلب هيتمسح نهائياً', async () => {
-    setBtnLoading(btn, 'جاري الإلغاء');
+    var origText = el.textContent;
+    el.textContent = 'جاري الإلغاء...';
+    el.style.pointerEvents = 'none';
     try {
       await cancelOrder(S.currentName);
       S.orders = S.orders.filter(o => normAr(o.name) !== normAr(S.currentName));
       S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
-      S.isDirty = false; resetBtn(btn); S.currentName = null;
+      S.isDirty = false; S.currentName = null;
+      el.textContent = origText; el.style.pointerEvents = '';
       showToast('تم إلغاء طلبك ✓');
       setTimeout(renderNameScreen, 800);
-    } catch (err) { resetBtn(btn); showToast(err.message || 'مشكلة في الإلغاء'); }
+    } catch (err) {
+      el.textContent = origText; el.style.pointerEvents = '';
+      showToast(err.message || 'مشكلة في الإلغاء');
+    }
   });
 }
 
@@ -852,7 +901,7 @@ async function submitOrder() {
     showToast('تم حفظ الطلب ✓');
   } catch (e) {
     if (e.message === 'الطلبات مقفولة') {
-      S.isLocked = true; stopUserPoll(); showToast('🔒 الطلبات اتقفلت!');
+      S.isLocked = true; showToast('🔒 الطلبات اتقفلت!');
       renderClosedScreen(S.currentName);
     } else if (e.message === 'الطلبات مش مفتوحة') {
       S.orderingOpen = false; resetBtn(btn);

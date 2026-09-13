@@ -102,6 +102,7 @@
   border-radius: 12px;
   text-align: center;
   text-decoration: none;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.12s;
 }
@@ -512,7 +513,12 @@
   font-size: 13px;
 }
 .sub-item:last-child { border-bottom: none; }
-.sub-note { font-size: 10px; color: var(--grey); }
+.sub-item .qty-tag {
+  background: var(--orange-light); color: var(--orange);
+  border-radius: 5px; padding: 1px 5px;
+  font-size: 11px; font-weight: 700; margin-right: 4px;
+}
+.sub-note { font-size: 10px; color: var(--grey); display: block; margin-top: 1px; }
 
 .sub-totals {
   background: var(--orange-light); border-radius: 10px;
@@ -552,3 +558,6 @@
   text-decoration: none; cursor: pointer;
 }
 .sub-link:first-child { color: var(--red); }
+
+/* Allow long toast messages to wrap instead of clipping */
+#toast { white-space: normal; text-align: center; }

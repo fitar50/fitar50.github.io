@@ -41,6 +41,7 @@ async function initLoad() {
     try { sessionStorage.setItem('fattar_menu', JSON.stringify(S.menu)); } catch(e) {}
 
     buildMenuFlat();
+    S._serverOrdersCount = S.orders.length;
     return true;
   } catch (e) {
     return false;
