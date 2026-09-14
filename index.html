@@ -7,15 +7,12 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#F5A623">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="فطار">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <!-- ?v= MUST be bumped on every deploy, together with CACHE_NAME in sw.js.
      Without it GitHub Pages' HTTP caching pins these files in the browser and
      users keep running old code for days. That was the original bug. -->
-<link rel="stylesheet" href="css/style.css?v=9">
-<link rel="stylesheet" href="css/additions.css?v=9">
+<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/additions.css?v=8">
 </head>
 <body>
 <div id="app">
@@ -139,7 +136,7 @@
     <button class="btn btn-primary" data-action="submitSameOrder">✅ ابعت نفس الطلب</button>
     <button class="btn btn-outline" data-action="newOrderInstead">➕ اطلب من جديد</button>
   </div>
-  <a class="back-link mgr-entry-link" data-action="goBackToName">الصفحة الرئيسية</a>
+  <a class="back-link mgr-entry-link" data-action="goBackToName">← تغيير الاسم</a>
 </div>
 <div id="screen-closed" class="screen">
   <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
@@ -304,13 +301,13 @@
 
 </div><!-- #app -->
 
-<script src="js/config.js?v=9"></script>
-<script src="js/utils.js?v=9"></script>
-<script src="js/api.js?v=9"></script>
-<script src="js/screens.js?v=9"></script>
-<script src="js/manager.js?v=9"></script>
-<script src="js/supermanager.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
+<script src="js/config.js?v=8"></script>
+<script src="js/utils.js?v=8"></script>
+<script src="js/api.js?v=8"></script>
+<script src="js/screens.js?v=8"></script>
+<script src="js/manager.js?v=8"></script>
+<script src="js/supermanager.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
 
 <script>
 // Service worker registration.

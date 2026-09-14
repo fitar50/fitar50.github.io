@@ -152,7 +152,8 @@ function renderManagerDashboard() {
           ${itemsHtml}
           <div class="oc-breakdown">
             <div class="oc-brow"><span>طعام</span><span>${food} جنيه</span></div>
-            <div class="oc-brow"><span>توصيل (${people} أشخاص)</span><span>${fmtNum(rounded - food)} جنيه</span></div>
+            <div class="oc-brow"><span>توصيل (${people} أشخاص)</span><span>${fmtNum(delShare)} جنيه</span></div>
+            <div class="oc-brow"><span>الفعلي</span><span>${fmtNum(total)} جنيه</span></div>
             <div class="oc-brow grand"><span>للتحصيل</span><span>${rounded.toFixed(0)} جنيه</span></div>
           </div>
         </div>`;

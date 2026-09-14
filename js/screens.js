@@ -217,8 +217,7 @@ function renderSubmittedScreen() {
     1
   );
   const delShare = S.deliveryFee / people;
-  const grand    = roundPersonTotal(foodTotal + delShare);
-  const displayedDel = grand - foodTotal;   // absorbs rounding so food + del = total
+  const grand    = foodTotal + delShare;
 
   document.getElementById('subList').innerHTML = items.map(i =>
     '<div class="sub-item"><span><span class="qty-tag">×' + i.qty + '</span>' + h(i.name) +
@@ -231,14 +230,14 @@ function renderSubmittedScreen() {
     : '';
 
   var delRow = S.deliveryFee > 0
-    ? '<div class="sub-trow"><span>توصيل (' + people + ' أشخاص)</span><span>' + fmtNum(displayedDel) + ' ج</span></div>' + delWarn
+    ? '<div class="sub-trow"><span>توصيل (' + people + ' أشخاص)</span><span>' + fmtNum(delShare) + ' ج</span></div>' + delWarn
     : '';
 
   document.getElementById('subTotalBox').innerHTML =
     '<div class="sub-totals">' +
     '<div class="sub-trow"><span>طعام</span><span>' + foodTotal + ' ج</span></div>' +
     delRow +
-    '<div class="sub-trow sub-grand"><span>حسابك</span><span>' + grand + ' جنيه</span></div>' +
+    '<div class="sub-trow sub-grand"><span>حسابك</span><span>' + roundPersonTotal(grand) + ' جنيه</span></div>' +
     '</div>';
 
   var piBox = document.getElementById('subPaymentBox');
@@ -254,7 +253,6 @@ function _buildPaymentBox() {
 
   const cards = [];
 
-  
   if (pi.paymentInstapay && pi.instapayNumber) {
     const isLink = /^https?:\/\//i.test(pi.instapayNumber.trim());
     const ipLogo = '<img class="pi-ip-logo" alt="" src="./icons/instapay.png">';
@@ -272,14 +270,13 @@ function _buildPaymentBox() {
       </div>`);
     }
   }
-
 if (pi.paymentCash) {
     cards.push(`<div class="pi-card pi-card-cash" data-action="cashTap">
       <div class="pi-card-label">💵 كاش</div>
       <div class="pi-card-detail">ادفع ل ${h(pi.collectorName)}</div>
     </div>`);
   }
-
+  
   const gridClass = cards.length === 1 ? 'pi-grid-single' : 'pi-grid-dual';
 
   return `
@@ -313,8 +310,7 @@ function renderClosedOrder(name, items) {
   const idx       = S.orders.findIndex(o => o.name === name);
   const delShare  = deliverySplit(S.deliveryFee, people)[idx >= 0 ? idx : 0];
   const foodTotal = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const grand     = roundPersonTotal(foodTotal + delShare);
-  const displayedDel = grand - foodTotal;
+  const grand     = foodTotal + delShare;
 
   document.getElementById('closedList').innerHTML = items.map(i => `
     <div class="summary-row">
@@ -328,8 +324,8 @@ function renderClosedOrder(name, items) {
   document.getElementById('closedTotalBox').innerHTML = `
     <div class="total-box">
       <div class="trow"><span>إجمالي الطعام</span><span>${foodTotal} جنيه</span></div>
-      <div class="trow"><span>التوصيل (${people} أشخاص)</span><span>${fmtNum(displayedDel)} جنيه</span></div>
-      <div class="trow grand"><span>حسابك</span><span>${grand} جنيه</span></div>
+      <div class="trow"><span>التوصيل (${people} أشخاص)</span><span>${fmtNum(delShare)} جنيه</span></div>
+      <div class="trow grand"><span>حسابك</span><span>${roundPersonTotal(grand)} جنيه</span></div>
     </div>`;
 
   // Payment usually happens AFTER locking, so the closed screen is exactly
