@@ -106,26 +106,17 @@ window.addEventListener('popstate', function () {
       S.isDirty    = false;
       S.orderedBy  = null;
       _clearRememberedUser(); // defined in app.js, available at runtime
-      if (S.isLocked) renderClosedScreen(S.currentName);
-      else             renderNameScreen();
+      _routeToCorrectScreen(); // defined in app.js, respects locked/ordering state
       break;
 
     case 'screen-mgr-login': {
       startUserPoll();
       // Respect the remembered user instead of always showing name screen
       var _rem = _loadRememberedUser();
-      var _rn = null;
       if (_rem && S.names.some(function(n) { return normAr(n) === normAr(_rem); })) {
-        _rn = S.names.find(function(n) { return normAr(n) === normAr(_rem); }) || _rem;
-        S.currentName = _rn;
+        S.currentName = S.names.find(function(n) { return normAr(n) === normAr(_rem); }) || _rem;
       }
-      if (S.isLocked) renderClosedScreen(_rn);
-      else if (!S.orderingOpen) renderNotOpenScreen();
-      else if (_rn) {
-        var _ex = S.orders.find(function(o) { return normAr(o.name) === normAr(_rn); });
-        if (_ex) renderSubmittedScreen();
-        else     renderOrderScreen(_rn);
-      } else renderNameScreen();
+      _routeToCorrectScreen();
       break;
     }
 
