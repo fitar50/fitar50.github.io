@@ -760,39 +760,9 @@ function exitManager() {
     S.orderingOpen = r.orderingOpen === true;
     if (r.paymentInfo) S.paymentInfo = r.paymentInfo;
     if (typeof r.deliveryFee === 'number') S.deliveryFee = r.deliveryFee;
-
-    // Restore remembered user so the manager doesn't have to pick their name
-    var rem = _loadRememberedUser();
-    var remName = null;
-    if (rem && S.names.some(n => normAr(n) === normAr(rem))) {
-      remName = S.names.find(n => normAr(n) === normAr(rem)) || rem;
-      S.currentName = remName;
-    }
-
-    if (S.isLocked) {
-      startUserPoll();
-      renderClosedScreen(remName);
-    } else if (!S.orderingOpen) {
-      startUserPoll();
-      renderNotOpenScreen();
-    } else {
-      startUserPoll();
-      if (remName) {
-        var existing = S.orders.find(o => normAr(o.name) === normAr(remName));
-        if (existing) {
-          S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
-          existing.items.forEach(i => {
-            S.currentQty[i.name] = (S.currentQty[i.name] || 0) + i.qty;
-            if (i.note) { S.currentNotes[i.name] = i.note; S.currentNoteQty[i.name] = (S.currentNoteQty[i.name] || 0) + i.qty; }
-          });
-          renderSubmittedScreen();
-        } else {
-          renderOrderScreen(remName);
-        }
-      } else {
-        renderNameScreen();
-      }
-    }
+    if (S.isLocked) renderClosedScreen(null);
+    else if (!S.orderingOpen) { startUserPoll(); renderNotOpenScreen(); }
+    else { startUserPoll(); renderNameScreen(); }
   }).catch(() => { startUserPoll(); renderNameScreen(); });
 }
 

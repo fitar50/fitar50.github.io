@@ -153,32 +153,15 @@ async function _processStatus(r) {
 
   // ── Reset (unlock) ────────────────────────────────────────────
   if (!r.locked && S.isLocked) {
+    S.currentName = null;
     S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
     S.isDirty = false;
     var ok2 = await initLoad();
     S.isLocked = false;
     S.lockTime = '';
     S.orderingOpen = r.orderingOpen === true;
+    if (!ok2) {}
     showToast('اتعمل تصفير \u2014 يوم جديد');
-
-    // Re-check the remembered user so they don't have to pick their name
-    // again after a reset. Their order is gone but their identity persists.
-    var remAfterReset = _loadRememberedUser();
-    if (remAfterReset && S.names.some(function(n) { return normAr(n) === normAr(remAfterReset); })) {
-      S.currentName = S.names.find(function(n) { return normAr(n) === normAr(remAfterReset); }) || remAfterReset;
-      if (S.orderingOpen) {
-        var lastR = _lastOrderFor(S.currentName);
-        var rItemsR = (lastR || [])
-          .filter(function(i) { return S.menuFlat.some(function(f) { return f.name === i.name; }); })
-          .map(function(i) { return { name: i.name, qty: i.qty, note: i.note, price: findPrice(i.name) }; });
-        if (rItemsR.length) { renderRepeatScreen(S.currentName, rItemsR); return; }
-        renderOrderScreen(S.currentName);
-        return;
-      }
-      renderNotOpenScreen();
-      return;
-    }
-    S.currentName = null;
     if (S.orderingOpen) renderNameScreen(); else renderNotOpenScreen();
     return;
   }
@@ -276,19 +259,6 @@ async function _processStatus(r) {
         if (box2) box2.innerHTML = _buildPaymentBox();
       }
     }
-  }
-}
-
-// Route to the right screen based on current ordering state. Used by goBackToName,
-// goHome, popstate, and anywhere the user needs to land on the correct screen
-// instead of blindly showing the name screen (which would let them order while locked).
-function _routeToCorrectScreen() {
-  if (S.isLocked) {
-    renderClosedScreen(S.currentName || null);
-  } else if (!S.orderingOpen) {
-    renderNotOpenScreen();
-  } else {
-    renderNameScreen();
   }
 }
 
@@ -410,14 +380,7 @@ document.addEventListener('click', e => {
       S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
       S.isDirty = false; S.orderedBy = null;
       _clearRememberedUser();
-      _routeToCorrectScreen();
-      break;
-
-    case 'goHome':
-      S.currentQty = {}; S.currentNotes = {}; S.currentNoteQty = {};
-      S.isDirty = false; S.orderedBy = null; S.currentName = null;
-      _clearRememberedUser();
-      _routeToCorrectScreen();
+      renderNameScreen();
       break;
 
     // Order screen
@@ -457,7 +420,7 @@ document.addEventListener('click', e => {
 
     // Payment card
     case 'cashTap':
-      showToast('روح ادفع بنفسك');
+      showToast('بتضغط على الزرار متوقع اني اجي اخد الفلوس يعني ولا ايه؟ مش فاهم 😂');
       break;
 
     // Manager login
