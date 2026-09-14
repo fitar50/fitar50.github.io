@@ -110,10 +110,24 @@ window.addEventListener('popstate', function () {
       else             renderNameScreen();
       break;
 
-    case 'screen-mgr-login':
-      if (S.isLocked) renderClosedScreen(null);
-      else             renderNameScreen();
+    case 'screen-mgr-login': {
+      startUserPoll();
+      // Respect the remembered user instead of always showing name screen
+      var _rem = _loadRememberedUser();
+      var _rn = null;
+      if (_rem && S.names.some(function(n) { return normAr(n) === normAr(_rem); })) {
+        _rn = S.names.find(function(n) { return normAr(n) === normAr(_rem); }) || _rem;
+        S.currentName = _rn;
+      }
+      if (S.isLocked) renderClosedScreen(_rn);
+      else if (!S.orderingOpen) renderNotOpenScreen();
+      else if (_rn) {
+        var _ex = S.orders.find(function(o) { return normAr(o.name) === normAr(_rn); });
+        if (_ex) renderSubmittedScreen();
+        else     renderOrderScreen(_rn);
+      } else renderNameScreen();
       break;
+    }
 
     case 'screen-manager':
       if (S.mgrRefreshTimer) {
