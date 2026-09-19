@@ -40,8 +40,16 @@ function renderNameScreen() {
     const orderedCount = S.orders.length;
     const totalCount   = S.names.length;
     if (totalCount > 0) {
-      const icon = orderedCount === totalCount ? '🎉' : '✅';
-      counterEl.textContent = `${icon} طلب ${orderedCount} من ${totalCount}`;
+      let msg;
+      if (orderedCount === 0) {
+        msg = '🕐 لسه ماحدش عمل اي اوردر';
+      } else if (orderedCount === 1) {
+        msg = ' فيه 1 بس عمل اوردر لحد دلوقتي';
+      } else {
+        const icon = orderedCount === totalCount ? '🎉' : '✅';
+        msg = `${icon} فيه ${orderedCount} عملوا اوردر`;
+      }
+      counterEl.textContent = msg;
       counterEl.style.display = 'block';
     } else {
       counterEl.style.display = 'none';

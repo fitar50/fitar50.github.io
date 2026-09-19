@@ -60,7 +60,7 @@ w.addEventListener('load', () => setTimeout(async () => {
     ok('S.deliveryFee from server', w.eval('S').deliveryFee===25, String(w.eval('S').deliveryFee));
     ok('noteSuggestions loaded', Object.keys(w.eval('S').noteSuggestions).length===1);
     ok('name select full width (pencil gone)', !$('#editNameBtn'));
-    ok('counter rendered', $('#orderCounter').textContent.includes('طلب 1 من 2'), $('#orderCounter').textContent);
+    ok('counter rendered', $('#orderCounter').textContent.includes('فيه 1 بس'), $('#orderCounter').textContent);
 
     // order screen
     $('#nameSelect').value='أحمد'; click('[data-action="proceedWithName"]');
