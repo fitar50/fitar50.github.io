@@ -1,0 +1,214 @@
+{
+ "getAll": {
+  "success": true,
+  "menu": {
+   "مشروبات ساخنة": [
+    {
+     "name": "شاي",
+     "price": 10
+    }
+   ],
+   "ساندوتشات": [
+    {
+     "name": "ساندوتش بطاطس",
+     "price": 20
+    }
+   ]
+  },
+  "names": [
+   "أحمد",
+   "سارة"
+  ],
+  "orders": [
+   {
+    "name": "سارة",
+    "items": [
+     {
+      "name": "شاي",
+      "qty": 2,
+      "price": 10
+     }
+    ],
+    "orderedBy": "سارة"
+   }
+  ],
+  "locked": false,
+  "lockTime": "",
+  "orderingOpen": true,
+  "ordersCount": 1,
+  "restaurants": [
+   {
+    "id": 1,
+    "name": "كشري",
+    "delivery_fee": 25
+   }
+  ],
+  "activeRestaurantId": 1,
+  "deliveryFee": 25,
+  "noteSuggestions": {
+   "ساندوتش بطاطس": [
+    "كاتشب بس",
+    "بدون مايونيز"
+   ]
+  },
+  "paymentInfo": {
+   "collectorName": "أحمد",
+   "paymentCash": true,
+   "paymentInstapay": true,
+   "instapayNumber": "01012345678"
+  }
+ },
+ "getStatus": {
+  "success": true,
+  "locked": false,
+  "lockTime": "",
+  "orderingOpen": true,
+  "ordersCount": 1,
+  "activeRestaurantId": 1,
+  "deliveryFee": 25,
+  "deliveryOverride": "",
+  "paymentInfo": {
+   "collectorName": "أحمد",
+   "paymentCash": true,
+   "paymentInstapay": true,
+   "instapayNumber": "01012345678"
+  }
+ },
+ "getOrders": {
+  "success": true,
+  "data": [
+   {
+    "name": "سارة",
+    "items": [
+     {
+      "name": "شاي",
+      "qty": 2,
+      "price": 10
+     }
+    ],
+    "orderedBy": "سارة"
+   }
+  ]
+ },
+ "getOrdersAdmin": {
+  "success": true,
+  "data": [
+   {
+    "name": "سارة",
+    "items": [
+     {
+      "name": "شاي",
+      "qty": 2,
+      "price": 10
+     }
+    ],
+    "orderedBy": "سارة",
+    "paid": false
+   },
+   {
+    "name": "أحمد",
+    "items": [
+     {
+      "name": "ساندوتش بطاطس",
+      "qty": 1,
+      "price": 20,
+      "note": "كاتشب بس"
+     }
+    ],
+    "orderedBy": "أحمد",
+    "paid": true
+   }
+  ]
+ },
+ "getNames": {
+  "success": true,
+  "data": [
+   "أحمد",
+   "سارة"
+  ]
+ },
+ "getNamesAdmin": {
+  "success": true,
+  "data": [
+   {
+    "name": "أحمد",
+    "instapay_number": "01012345678"
+   },
+   {
+    "name": "سارة",
+    "instapay_number": ""
+   }
+  ]
+ },
+ "getRestaurants": {
+  "success": true,
+  "data": [
+   {
+    "id": 1,
+    "name": "كشري",
+    "delivery_fee": 25
+   }
+  ]
+ },
+ "getMenu": {
+  "success": true,
+  "data": {
+   "ساندوتشات": [
+    {
+     "name": "ساندوتش بطاطس",
+     "price": 20
+    }
+   ]
+  }
+ },
+ "getMenuAdmin": {
+  "success": true,
+  "data": [
+   {
+    "id": 1,
+    "name": "كشري",
+    "delivery_fee": 25,
+    "items": [
+     {
+      "id": 7,
+      "restaurant_id": 1,
+      "category": "مشروبات ساخنة",
+      "name": "شاي",
+      "price": 10,
+      "sort_order": 1
+     },
+     {
+      "id": 8,
+      "restaurant_id": 1,
+      "category": "ساندوتشات",
+      "name": "ساندوتش بطاطس",
+      "price": 20,
+      "sort_order": 1
+     }
+    ],
+    "noteSuggestions": [
+     {
+      "id": 3,
+      "item_name": "ساندوتش بطاطس",
+      "note": "كاتشب بس"
+     }
+    ]
+   }
+  ]
+ },
+ "verify": {
+  "success": true
+ },
+ "verifySuperMgr": {
+  "success": true
+ },
+ "setPaid": {
+  "success": true
+ },
+ "setPaymentInfo": {
+  "success": true
+ },
+ "setDeliveryOverride": {
+  "success": true
+ }
+}
