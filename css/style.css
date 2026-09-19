@@ -1,0 +1,676 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, 'Segoe UI', Tahoma, Arial, sans-serif;
+  background: #F5F4F0;
+  color: #1C1C1E;
+  direction: rtl;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== CSS VARIABLES ===== */
+:root {
+  --orange:        #E8702A;
+  --orange-dark:   #C85A18;
+  --orange-light:  #FFF3EB;
+  --orange-mid:    #FDDFC8;
+  --dark:          #1C1C1E;
+  --grey:          #8E8E93;
+  --border:        #E5E5EA;
+  --bg:            #F5F4F0;
+  --white:         #FFFFFF;
+  --green:         #34C759;
+  --red:           #FF3B30;
+  --red-light:     #FFF0EF;
+  --shadow-sm:     0 1px 6px rgba(0,0,0,0.08);
+  --shadow:        0 2px 14px rgba(0,0,0,0.10);
+  --radius:        14px;
+  --radius-sm:     10px;
+}
+
+/* ===== LAYOUT ===== */
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--bg);
+  position: relative;
+}
+
+/* ===== SCREENS ===== */
+.screen { display: none; min-height: 100vh; padding-bottom: 96px; }
+.screen.active { display: block; }
+
+/* ===== HEADER ===== */
+.hdr {
+  background: var(--orange);
+  color: #fff;
+  padding: 18px 20px 14px;
+  text-align: center;
+  position: static;
+}
+.hdr h1 { font-size: 19px; font-weight: 800; letter-spacing: 0.2px; }
+.hdr p  { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+.hdr-dark { background: #1C1C1E; }
+
+/* ===== CARD ===== */
+.card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  margin: 14px 14px 0;
+  overflow: hidden;
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+  display: block; width: 100%;
+  padding: 15px 20px;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 16px; font-weight: 700;
+  cursor: pointer; transition: all 0.15s;
+  font-family: inherit; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+.btn:active { transform: scale(0.98); }
+.btn-primary  { background: var(--orange); color: #fff; }
+.btn-primary:active  { background: var(--orange-dark); }
+.btn-outline  { background: var(--orange-light); color: var(--orange); border: 2px solid var(--orange); }
+.btn-red      { background: var(--red-light);    color: var(--red);    border: 2px solid var(--red); }
+.btn-green    { background: var(--green); color: #fff; }
+.btn-grey     { background: #E5E5EA; color: var(--dark); }
+.btn:disabled { background: #C7C7CC; color: #fff; cursor: not-allowed; transform: none; }
+
+/* Button spinner */
+.btn-spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== FORM ===== */
+.field-label { display: block; font-size: 13px; font-weight: 700; color: var(--grey); margin-bottom: 7px; }
+.sel-wrap { position: relative; }
+.sel-wrap::after {
+  content: '▼'; position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%); pointer-events: none;
+  color: var(--grey); font-size: 11px;
+}
+select, input[type="text"], input[type="password"] {
+  width: 100%; padding: 14px 16px;
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 16px; font-family: inherit; direction: rtl;
+  background: #fff; -webkit-appearance: none; appearance: none;
+  color: var(--dark); outline: none;
+  transition: border-color 0.15s;
+}
+select:focus, input:focus { border-color: var(--orange); }
+
+/* ===== LOADING ===== */
+#screen-loading {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; min-height: 100vh;
+}
+.spinner {
+  width: 42px; height: 42px;
+  border: 4px solid var(--border);
+  border-top-color: var(--orange);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+/* ===== ERROR / RETRY SCREEN ===== */
+.error-screen {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; min-height: 100vh;
+  padding: 20px;
+  text-align: center;
+}
+.error-screen .e-icon { font-size: 48px; }
+.error-screen h2 { font-size: 20px; font-weight: 800; }
+.error-screen p { color: var(--grey); font-size: 14px; margin: 4px 0 16px; }
+
+/* ===== NAME SCREEN ===== */
+.name-hero { text-align: center; padding: 32px 20px 20px; }
+.name-hero .emoji { font-size: 52px; display: block; margin-bottom: 10px; }
+.name-hero h2 { font-size: 22px; font-weight: 800; }
+.name-hero p  { font-size: 14px; color: var(--grey); margin-top: 6px; }
+.name-body { padding: 16px 16px 0; }
+.name-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+.name-row .sel-wrap { flex: 1; }
+.edit-name-btn {
+  width: 46px; height: 48px; flex-shrink: 0;
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+  background: #fff; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s;
+}
+.edit-name-btn:hover { border-color: var(--orange); }
+#newNameWrap { margin-bottom: 12px; display: none; }
+.hint { text-align: center; font-size: 12px; color: var(--grey); padding: 10px 0 0; }
+
+/* Bug #12 — order progress counter on name screen */
+.order-counter {
+  text-align: center;
+  font-size: 14px; font-weight: 700;
+  color: var(--orange-dark);
+  background: var(--orange-light);
+  border-radius: 20px;
+  padding: 8px 16px;
+  margin: 10px 14px 0;
+  border: 1.5px solid var(--orange-mid);
+}
+
+/* Bug #6 — inline name-edit row */
+.edit-name-row {
+  display: flex; gap: 8px; align-items: stretch;
+}
+.edit-name-row input {
+  flex: 1; min-width: 0;
+}
+.edit-name-save,
+.edit-name-cancel {
+  width: auto; padding: 12px 14px;
+  font-size: 13px; white-space: nowrap;
+}
+
+/* Last-order preview card (shown on name screen after selecting name) */
+.lo-preview {
+  background: #f0f7ff;
+  border: 1.5px solid #90caf9;
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 0;
+}
+.lo-preview-label {
+  font-size: 12px; font-weight: 700;
+  color: #1565c0; margin-bottom: 5px;
+}
+.lo-preview-items {
+  font-size: 13px; color: #333; line-height: 1.5;
+  direction: rtl;
+}
+
+/* ===== ORDER SCREEN ===== */
+.category-block { border-bottom: 1px solid var(--border); }
+.category-block:last-child { border-bottom: none; }
+.cat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+.cat-header:active { background: var(--bg); }
+.cat-title { font-size: 16px; font-weight: 800; }
+.cat-right { display: flex; align-items: center; gap: 8px; }
+.cat-badge {
+  background: var(--orange); color: #fff;
+  border-radius: 20px; padding: 2px 9px;
+  font-size: 12px; font-weight: 700;
+  display: none;
+}
+.cat-badge.show { display: block; }
+.cat-chevron { font-size: 11px; color: var(--grey); transition: transform 0.25s; }
+.category-block.open .cat-chevron { transform: rotate(180deg); }
+/* FIX: manager order cards use .order-card.open for chevron rotation */
+.order-card.open .cat-chevron { transform: rotate(180deg); }
+.cat-items { display: none; padding: 0 14px 10px; }
+.category-block.open .cat-items { display: block; }
+/* ===== NOT OPEN SCREEN ===== */
+.not-open-screen {
+  min-height: calc(100vh - 76px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.not-open-icon {
+  font-size: 52px;
+  margin-bottom: 14px;
+}
+
+.not-open-title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.not-open-sub {
+  color: var(--grey);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+/* ===== ITEM ROW ===== */
+.item-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 4px; border-bottom: 1px solid var(--border);
+}
+.item-row:last-child { border-bottom: none; }
+
+/* ===== ITEM WRAP (order screen) =====
+   Wraps .item-row + note button + note input so the border separator
+   sits on the wrapper, not the row, keeping dividers correct when
+   the note elements are visible. */
+.item-wrap { border-bottom: 1px solid var(--border); }
+.item-wrap:last-child { border-bottom: none; }
+/* Override row border when inside wrap — wrap provides the separator */
+.item-wrap .item-row { border-bottom: none; padding-bottom: 4px; }
+
+/* Note toggle button — hidden until item qty > 0, toggled by chgQty() */
+.note-btn {
+  display: block; background: none; border: none;
+  font-size: 12px; color: var(--grey); cursor: pointer;
+  padding: 0 4px 8px; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.note-btn.has-note { color: var(--orange); font-weight: 700; }
+
+/* Note input wrapper — display:none by default, set to block by toggleNoteInput() */
+.note-input-wrap { display: none; padding: 0 4px 8px; }
+.note-input {
+  width: 100%; padding: 8px 12px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px; font-family: inherit; direction: rtl;
+  background: #fff; outline: none; color: var(--dark);
+  transition: border-color 0.15s;
+}
+.note-input:focus { border-color: var(--orange); }
+.item-info { flex: 1; padding-left: 10px; }
+.item-name  { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.item-price { font-size: 12px; color: var(--grey); margin-top: 2px; }
+
+/* ===== QTY CONTROL ===== */
+.qty { display: flex; align-items: center; }
+.qty-btn {
+  width: 34px; height: 34px;
+  border: 2px solid var(--orange); background: #fff;
+  color: var(--orange); font-size: 20px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent; transition: all 0.12s;
+  line-height: 1;
+}
+.qty-btn.minus { border-radius: 8px 0 0 8px; }
+.qty-btn.plus  { border-radius: 0 8px 8px 0; }
+.qty-btn:active { background: var(--orange); color: #fff; }
+.qty-num {
+  width: 36px; height: 34px;
+  border-top: 2px solid var(--orange); border-bottom: 2px solid var(--orange);
+  background: var(--orange-light);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: var(--orange);
+}
+.qty-num.nonzero { background: var(--orange-mid); }
+
+/* ===== STICKY FOOTER (order screen) ===== */
+.sticky-foot {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  background: #fff; padding: 12px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -2px 16px rgba(0,0,0,0.10); z-index: 50;
+}
+.total-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.total-bar span { font-size: 14px; color: var(--grey); }
+.total-bar strong { font-size: 20px; font-weight: 800; color: var(--orange); }
+
+/* ===== SUBMITTED SCREEN ===== */
+.big-icon { text-align: center; font-size: 56px; padding: 32px 0 10px; }
+.sub-name  { text-align: center; font-size: 22px; font-weight: 800; }
+.sub-label { text-align: center; font-size: 14px; color: var(--grey); margin: 4px 0 20px; }
+.summary-list { padding: 0 4px; }
+.summary-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-row .qty-tag {
+  background: var(--orange-light); color: var(--orange);
+  border-radius: 6px; padding: 2px 7px;
+  font-size: 12px; font-weight: 700; margin-right: 6px;
+}
+
+/* ===== TOTAL BOX ===== */
+.total-box {
+  background: var(--orange-light); border-radius: var(--radius-sm);
+  padding: 14px 16px; margin: 12px 14px;
+}
+.trow { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; }
+.trow.grand {
+  border-top: 1px dashed #E0BBA0; margin-top: 8px; padding-top: 10px;
+  font-size: 16px; font-weight: 800; color: var(--orange);
+}
+.trow .note { font-size: 11px; color: var(--grey); margin-top: 2px; }
+/* Note tag inside a summary-row (submitted + closed screens) */
+.summary-note {
+  display: block;
+  font-size: 11px;
+  color: var(--grey);
+  margin-top: 3px;
+}
+/* "يطبق على − N +" row inside note-input-wrap (order screen) */
+.note-qty-row {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px 2px;
+  font-size: 13px;
+  color: var(--grey);
+  direction: rtl;
+}
+.note-qty-label { flex-shrink: 0; }
+.note-qty-ctrl  { display: flex; align-items: center; gap: 4px; }
+.note-qty-btn {
+  width: 28px; height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+.note-qty-btn:active { background: var(--border); }
+.note-qty-num { min-width: 20px; text-align: center; font-weight: 600; color: var(--orange); }
+.note-qty-of  { color: var(--grey); font-size: 12px; }
+.trow .note-alert {
+  font-size: 12px; color: var(--orange-dark); font-weight: 700;
+  background: #fff; padding: 6px 10px; border-radius: 8px;
+  margin-top: 6px; display: inline-block;
+}
+
+/* ===== ACTION BUTTONS ROW ===== */
+.act-row { display: flex; flex-direction: column; gap: 10px; padding: 0 14px; }
+
+/* ===== CLOSED SCREEN ===== */
+.lock-icon  { text-align: center; font-size: 52px; padding: 30px 0 10px; }
+.lock-title { text-align: center; font-size: 22px; font-weight: 800; }
+.lock-sub   { text-align: center; font-size: 13px; color: var(--grey); margin: 5px 0 20px; }
+
+/* ===== MANAGER LOGIN ===== */
+.login-wrap { padding: 40px 18px 20px; }
+.login-icon  { text-align: center; font-size: 56px; margin-bottom: 18px; }
+.login-title { text-align: center; font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+.login-sub   { text-align: center; font-size: 14px; color: var(--grey); margin-bottom: 30px; }
+.form-group  { margin-bottom: 14px; }
+.back-link {
+  display: block; text-align: center; margin-top: 18px;
+  color: var(--grey); font-size: 13px; text-decoration: none;
+  cursor: pointer;
+}
+
+/* ===== MANAGER DASHBOARD ===== */
+.stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px; padding: 14px 14px 0;
+}
+.stat {
+  background: #fff; border-radius: var(--radius-sm);
+  padding: 14px 10px; text-align: center; box-shadow: var(--shadow-sm);
+}
+.stat-val { font-size: 22px; font-weight: 900; color: var(--orange); }
+.stat-lbl { font-size: 11px; color: var(--grey); margin-top: 3px; }
+
+.section-title {
+  padding: 18px 14px 8px;
+  font-size: 12px; font-weight: 800;
+  color: var(--grey); text-transform: uppercase; letter-spacing: 0.6px;
+}
+
+/* ===== TOTAL SUMMARY CARD (manager) ===== */
+.total-summary { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin: 0 14px; overflow: hidden; }
+.ts-header { background: var(--orange); color: #fff; padding: 12px 16px; font-weight: 800; font-size: 14px; }
+.ts-row { display: flex; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.ts-row:last-child { border-bottom: none; }
+.ts-grand { display: flex; justify-content: space-between; padding: 12px 16px; background: var(--orange-light); font-weight: 800; font-size: 15px; color: var(--orange); }
+
+/* Copy order button */
+.copy-btn {
+  display: block; width: calc(100% - 32px); margin: 10px 16px 0;
+  padding: 10px; border: 2px dashed var(--orange);
+  border-radius: var(--radius-sm); background: var(--orange-light);
+  color: var(--orange); font-size: 14px; font-weight: 700;
+  cursor: pointer; font-family: inherit; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+/* FIX: was missing closing ) on var() — caused potential CSS parse errors downstream */
+.copy-btn:active { background: var(--orange-mid); }
+
+/* ===== PERSON ORDER CARD (manager) ===== */
+.order-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin: 0 14px 10px; overflow: hidden; }
+
+/* FIX: header now holds edit/delete icon buttons so they're always accessible */
+.oc-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; background: var(--orange-light); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; gap: 8px;
+}
+.oc-header-info { flex: 1; min-width: 0; }
+.oc-header-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.oc-name  { font-size: 15px; font-weight: 800; }
+.oc-ordered-by {
+  font-size: 11px; color: var(--grey); font-weight: 400;
+  margin-top: 2px;
+}
+.oc-total { font-size: 13px; font-weight: 700; color: var(--orange); white-space: nowrap; }
+
+/* Icon action buttons — always visible on the card header */
+.oc-icon-btn {
+  width: 32px; height: 32px; border: none; border-radius: 8px;
+  background: rgba(0,0,0,0.07); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+  font-family: inherit; transition: background 0.12s, transform 0.12s;
+  line-height: 1;
+}
+.oc-icon-btn:active { transform: scale(0.88); }
+.oc-icon-btn.oc-del:active { background: var(--red-light); }
+.oc-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.oc-body  { display: none; }
+.oc-body.open { display: block; }
+.oc-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.oc-item:last-child { border-bottom: none; }
+/* Note row shown below an order item when it has a customization note */
+.oc-item-note {
+  padding: 2px 16px 8px;
+  font-size: 12px; color: var(--grey);
+  border-bottom: 1px solid var(--border);
+}
+/* When note row is immediately before .oc-breakdown, suppress double border */
+.oc-item-note:last-of-type { border-bottom: none; }
+.oc-breakdown { padding: 10px 16px 12px; background: #FAFAFA; border-top: 1px solid var(--border); }
+.oc-brow { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; color: var(--grey); }
+.oc-brow.grand { color: var(--orange); font-weight: 800; font-size: 15px; padding-top: 8px; border-top: 1px dashed #ddd; margin-top: 4px; }
+
+/* ===== ADD PERSON (manager) ===== */
+.add-person-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin: 0 14px; padding: 16px; }
+.add-person-card .sel-wrap { margin-bottom: 10px; }
+.add-person-card input { margin-bottom: 10px; }
+.inline-btn {
+  display: inline-block; width: auto;
+  padding: 10px 20px; border: none;
+  border-radius: 8px; font-size: 14px; font-weight: 700;
+  background: var(--orange-light); color: var(--orange);
+  cursor: pointer; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== MANAGER ACTIONS ===== */
+.mgr-actions { padding: 0 14px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.locked-badge {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px; background: #E8F8EE; border-radius: var(--radius-sm);
+  color: var(--green); font-weight: 800; font-size: 15px;
+}
+.ordering-open-badge {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px; background: #E8F8EE; border-radius: var(--radius-sm);
+  color: var(--green); font-weight: 800; font-size: 15px;
+}
+.ordering-closed-badge {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px; background: var(--red-light); border-radius: var(--radius-sm);
+  color: var(--red); font-weight: 800; font-size: 15px;
+}
+.refresh-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 14px 0;
+}
+.refresh-btn {
+  background: none; border: none; color: var(--orange);
+  font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.last-updated { font-size: 11px; color: var(--grey); }
+
+/* ===== EDIT MODAL ===== */
+/* FIX: was z-index 200 (too low in some stacking contexts) + used 'inset' shorthand
+   (limited older browser support). Now z-index 1000, explicit positioning,
+   display:flex so modal box is always centered and visible, iOS scroll fix added. */
+#editModal {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.55); z-index: 1000;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 20px 16px;
+  align-items: flex-start; justify-content: center;
+}
+.modal-box {
+  background: #fff; border-radius: 20px;
+  width: 100%; max-width: 480px; margin: 0 auto;
+  overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+}
+.modal-hdr {
+  background: var(--orange); color: #fff;
+  padding: 14px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-hdr h3 { font-size: 16px; font-weight: 800; }
+
+/* FIX: close button was too small for mobile tapping (was ~26px, no background).
+   Now 36x36 circular button — easy to tap, clearly visible. */
+.modal-close {
+  background: rgba(255,255,255,0.18); border: none; color: #fff;
+  font-size: 20px; cursor: pointer; padding: 0;
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.modal-close:active { background: rgba(255,255,255,0.35); }
+
+.modal-body { max-height: 65vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.modal-foot { padding: 12px 16px 16px; border-top: 1px solid var(--border); }
+
+/* ===== TOAST ===== */
+#toast {
+  position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(10px);
+  background: #333; color: #fff;
+  padding: 11px 22px; border-radius: 24px;
+  font-size: 14px; opacity: 0; transition: all 0.25s;
+  z-index: 1100; white-space: nowrap; pointer-events: none;
+  max-width: 90vw; text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== EMPTY STATE ===== */
+.empty { text-align: center; padding: 40px 20px; color: var(--grey); }
+.empty .e-icon { font-size: 40px; margin-bottom: 10px; }
+.empty p { font-size: 14px; }
+
+/* ===== MANAGER ENTRY LINK ===== */
+.mgr-entry-link {
+  display: block; text-align: center;
+  margin: 18px 0 8px; font-size: 13px;
+  color: #C7C7CC; text-decoration: none;
+  cursor: pointer; letter-spacing: 0.2px;
+}
+.mgr-entry-link:hover { color: var(--grey); }
+
+/* ===== DIRTY WARNING ===== */
+.dirty-bar {
+  background: var(--red-light); color: var(--red);
+  padding: 10px 16px; font-size: 13px; font-weight: 700;
+  text-align: center; border-bottom: 1px solid var(--border);
+}
+
+/* ===== CONFIRM SHEET ===== */
+/* Bottom-sheet style replacement for browser confirm() dialogs.
+   Used for any action that writes to the Google Sheet (cancel order,
+   delete order, lock, reset, delete name). */
+#confirmModal {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 2000;
+  align-items: flex-end;
+  justify-content: center;
+}
+.confirm-sheet {
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 28px 18px 36px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 -4px 30px rgba(0,0,0,0.18);
+}
+.confirm-msg {
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 22px;
+  color: var(--dark);
+  line-height: 1.55;
+}
+.confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+.confirm-btns .btn {
+  flex: 1;
+  padding: 14px;
+}
+
+/* ===== NAME MANAGEMENT (manager dashboard) ===== */
+.name-mgmt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.name-mgmt-row:last-child {
+  border-bottom: none;
+}
+.name-mgmt-label {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.name-has-order {
+  background: #e8f8ee;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
