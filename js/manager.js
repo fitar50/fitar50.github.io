@@ -57,9 +57,6 @@ function renderManagerDashboard() {
   // ── Restaurant + Payment config section ──
   _renderMgrConfig();
 
-  // ── Auto reset / auto open schedule section ──
-  _renderMgrSchedule();
-
   // ── Total summary ──
   const ts = document.getElementById('totalSummary');
   if (!orders.length) {
@@ -73,9 +70,10 @@ function renderManagerDashboard() {
         grouped[key].qty += i.qty;
       });
     });
-    const sortedKeys = Object.keys(grouped).sort((a, b) =>
-      grouped[a].name.localeCompare(grouped[b].name, 'ar') ||
-      (grouped[a].note || '').localeCompare(grouped[b].note || '', 'ar'));
+    const sortedKeys = Object.keys(grouped).sort((a, b) => {
+      const diff = grouped[b].qty - grouped[a].qty;
+      return diff !== 0 ? diff : grouped[a].name.localeCompare(grouped[b].name);
+    });
     let food = 0;
     let rowsHtml = '';
     sortedKeys.forEach(key => {
@@ -173,119 +171,6 @@ function renderManagerDashboard() {
 // NOTE: this card is rebuilt by the 10s auto-refresh. Every input's current
 // value is read BEFORE the rebuild and restored, otherwise the manager cannot
 // finish typing a phone number.
-function _renderMgrSchedule() {
-  const section = document.getElementById('mgrScheduleSection');
-  if (!section) return;
-
-  // Same focus guard as the payment card: don't rebuild while the manager is
-  // mid-edit (the dashboard auto-refreshes every 10s).
-  const ae = document.activeElement;
-  if (ae && ae !== document.body && section.contains(ae) &&
-      /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
-
-  const sc = S.schedule || {};
-  const knownNames = (S.namesAdmin || []).map(n => n.name);
-  const pad = n => String(n).padStart(2, '0');
-  const resetVal = `${pad(sc.resetHour ?? 20)}:${pad(sc.resetMinute ?? 0)}`;
-  const openVal  = `${pad(sc.openHour ?? 6)}:${pad(sc.openMinute ?? 0)}`;
-
-  // Preserve in-progress edits across the auto-refresh.
-  const curReset    = document.getElementById('resetTime')?.value      ?? resetVal;
-  const curAutoOpen = document.getElementById('autoOpenChk')?.checked  ?? !!sc.autoOpenEnabled;
-  const curOpen     = document.getElementById('openTime')?.value       ?? openVal;
-  const savedColl   = sc.openCollectorName || '';
-  const curColl     = document.getElementById('openCollectorSel')?.value
-    ?? (savedColl && knownNames.includes(savedColl) ? savedColl : (savedColl ? '__other__' : ''));
-  const curCollOther = document.getElementById('openCollectorOther')?.value
-    ?? (savedColl && !knownNames.includes(savedColl) ? savedColl : '');
-  const curCash     = document.getElementById('openCash')?.checked     ?? !!sc.openPayCash;
-  const curInstapay = document.getElementById('openInstapay')?.checked ?? !!sc.openPayInstapay;
-  const curInum     = document.getElementById('openInstapayNum')?.value ?? (sc.openInstapayNumber || '');
-  const isOther     = curColl === '__other__';
-
-  const collectorOptions = knownNames
-    .map(n => `<option value="${h(n)}" ${curColl === n ? 'selected' : ''}>${h(n)}</option>`).join('');
-
-  section.innerHTML = `
-    <div class="mgr-config-card">
-      <div class="cfg-active-rest" style="background:#eef4ff;border-color:#c9d9ff;color:#2b4b8f;">⏰ التصفير والفتح التلقائي</div>
-
-      <div class="cfg-row">
-        <span class="cfg-label">وقت التصفير اليومي (يمسح الطلبات ويقفل التطبيق)</span>
-        <input id="resetTime" type="time" class="cfg-text-input" style="direction:ltr;text-align:center;" value="${curReset}">
-      </div>
-
-      <div class="cfg-row">
-        <label class="cfg-check-label"><input type="checkbox" id="autoOpenChk" ${curAutoOpen ? 'checked' : ''}> افتح الطلبات تلقائياً كل يوم</label>
-      </div>
-
-      <div id="autoOpenBox" style="${curAutoOpen ? '' : 'display:none;'}">
-        <div class="cfg-row">
-          <span class="cfg-label">وقت الفتح</span>
-          <input id="openTime" type="time" class="cfg-text-input" style="direction:ltr;text-align:center;" value="${curOpen}">
-        </div>
-
-        <div class="cfg-row">
-          <span class="cfg-label">المسؤول عن التحصيل (افتراضي)</span>
-          <div class="sel-wrap">
-            <select id="openCollectorSel">
-              <option value="">-- اختار --</option>
-              ${collectorOptions}
-              <option value="__other__" ${isOther ? 'selected' : ''}>➕ شخص آخر</option>
-            </select>
-          </div>
-          <div id="openCollectorOtherWrap" style="${isOther ? '' : 'display:none;'}margin-top:8px;">
-            <input id="openCollectorOther" type="text" class="cfg-text-input" placeholder="اسم المسؤول" maxlength="30" value="${h(curCollOther)}">
-          </div>
-        </div>
-
-        <div class="cfg-row">
-          <span class="cfg-label">طريقة الدفع (افتراضي)</span>
-          <div class="cfg-check-row">
-            <label class="cfg-check-label"><input type="checkbox" id="openCash" ${curCash ? 'checked' : ''}> كاش</label>
-            <label class="cfg-check-label"><input type="checkbox" id="openInstapay" ${curInstapay ? 'checked' : ''}> إنستاباي</label>
-          </div>
-        </div>
-
-        <div class="cfg-row" id="openInstapayRow" ${curInstapay ? '' : 'style="display:none"'}>
-          <span class="cfg-label">لينك الإنستاباي</span>
-          <input id="openInstapayNum" type="url" placeholder="https://ipn.eg/S/..." maxlength="120"
-            class="cfg-text-input" style="direction:ltr;text-align:left;font-size:13px;" value="${h(curInum)}">
-        </div>
-      </div>
-
-      <button class="btn btn-primary" style="width:100%;margin-top:4px;" data-action="doSaveSchedule">💾 حفظ المواعيد</button>
-    </div>`;
-}
-
-async function doSaveSchedule() {
-  const rt = (document.getElementById('resetTime')?.value || '20:00').split(':');
-  const ot = (document.getElementById('openTime')?.value  || '06:00').split(':');
-  const autoOpen = document.getElementById('autoOpenChk')?.checked || false;
-  let collector  = document.getElementById('openCollectorSel')?.value || '';
-  if (collector === '__other__') collector = (document.getElementById('openCollectorOther')?.value || '').trim();
-  const cash     = document.getElementById('openCash')?.checked     || false;
-  const instapay = document.getElementById('openInstapay')?.checked || false;
-  const inum     = (document.getElementById('openInstapayNum')?.value || '').trim();
-
-  const data = {
-    resetHour:   parseInt(rt[0], 10), resetMinute: parseInt(rt[1], 10),
-    autoOpenEnabled: autoOpen,
-    openHour:    parseInt(ot[0], 10), openMinute:  parseInt(ot[1], 10),
-    openCollectorName: collector, openPayCash: cash, openPayInstapay: instapay, openInstapayNumber: inum
-  };
-  try {
-    await api('saveSchedule', { data, ref: S.mgrKey });
-    S.schedule = { resetHour: data.resetHour, resetMinute: data.resetMinute, autoOpenEnabled: autoOpen,
-      openHour: data.openHour, openMinute: data.openMinute, openCollectorName: collector,
-      openPayCash: cash, openPayInstapay: instapay, openInstapayNumber: inum };
-    showToast('تم حفظ المواعيد ✓');
-    _renderMgrSchedule();
-  } catch (e) {
-    showToast(e.message || 'فشل حفظ المواعيد ❌');
-  }
-}
-
 function _renderMgrConfig() {
   const section = document.getElementById('mgrConfigSection');
   if (!section) return;
@@ -623,26 +508,14 @@ function buildRestaurantText() {
       grouped[key].qty += i.qty;
     });
   });
-  const lines = Object.values(grouped)
-    .sort((a, b) => a.name.localeCompare(b.name, 'ar') || (a.note || '').localeCompare(b.note || '', 'ar'))
-    .map(g => g.note ? `${g.name} (${g.note}) × ${g.qty}` : `${g.name} × ${g.qty}`);
+  const lines = Object.values(grouped).map(g =>
+    g.note ? `${g.name} (${g.note}) × ${g.qty}` : `${g.name} × ${g.qty}`
+  );
   const totalItems = S.orders.reduce((t, o) => t + o.items.reduce((s, i) => s + i.qty, 0), 0);
   return `طلب فطار الشغل:\n${lines.join('\n')}\n\nالإجمالي: ${totalItems} صنف + توصيل ${S.deliveryFee} ج`;
 }
 
 // ── Ordering toggle ──────────────────────────────────────────────
-async function doNotifyArrived() {
-  if (!S.orders.length) { showToast('مفيش طلبات تنبّه عليها'); return; }
-  showConfirm('تبعت إشعار لكل اللي طلبوا إن الأكل وصل؟', async () => {
-    try {
-      const r = await api('notifyArrived', { ref: S.mgrKey });
-      showToast(`تم إرسال الإشعار ✓ (${r.sent || 0})`);
-    } catch (e) {
-      showToast(e.message || 'فشل إرسال الإشعار ❌');
-    }
-  });
-}
-
 async function doToggleOrdering() {
   const newState = !S.orderingOpen;
   if (newState && !S.activeRestaurantId) {
@@ -672,14 +545,9 @@ async function doToggleOrdering() {
 
 function _renderMgrActions() {
   const mgrActions = document.getElementById('mgrActions');
-  // Notify button only appears when push is actually configured on the server.
-  const notifyBtn = S.vapidPublicKey
-    ? `<button class="btn btn-green" data-action="doNotifyArrived">🍽️ الأكل وصل - نبّه الكل</button>`
-    : '';
   if (S.isLocked) {
     mgrActions.innerHTML = `
       <div class="locked-badge">✅ الطلبات مقفولة — تم الإرسال ${S.lockTime}</div>
-      ${notifyBtn}
       <button class="btn btn-red" data-action="doReset">🔄 تصفير الطلبات</button>`;
     return;
   }
@@ -694,7 +562,6 @@ function _renderMgrActions() {
   mgrActions.innerHTML = `
     ${toggleHtml}
     ${lockHtml}
-    ${notifyBtn}
     <button class="btn btn-red" data-action="doReset">🔄 تصفير الطلبات</button>
     <div style="border-top:1px solid #eee;margin-top:12px;padding-top:12px;">
       <button class="btn btn-outline" style="width:100%;font-size:13px;" data-action="showSuperMgrFromMgr">

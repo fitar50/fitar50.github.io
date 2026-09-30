@@ -580,16 +580,3 @@
 .footer-link:active { background: rgba(0,0,0,0.06); }
 .footer-link:hover  { color: var(--dark); }
 .footer-link-danger { color: var(--red); }
-
-/* ===== PUSH PROMPT (submitted screen) ===== */
-#pushPrompt { margin: 12px 14px 0; }
-.push-btn { width: 100%; }
-.push-on, .push-off {
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 12px;
-  border-radius: 10px;
-}
-.push-on  { background: #E8F8EE; color: var(--green); }
-.push-off { background: #F2F2F2; color: var(--grey); }

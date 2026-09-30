@@ -251,7 +251,6 @@ function renderSubmittedScreen() {
   var piBox = document.getElementById('subPaymentBox');
   if (piBox) piBox.innerHTML = S.isLocked ? _buildPaymentBox() : '';
 
-  if (typeof renderPushPrompt === 'function') renderPushPrompt();
   showScreen('screen-submitted');
 }
 

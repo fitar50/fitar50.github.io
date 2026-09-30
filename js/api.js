@@ -39,8 +39,6 @@ async function initLoad() {
     S.noteSuggestions   = r.noteSuggestions   || {};
     S.lastOrders        = r.lastOrders        || {};
     S.paymentInfo       = r.paymentInfo       || { collectorName: '', paymentCash: false, paymentInstapay: false, instapayNumber: '' };
-    S.schedule          = r.schedule          || { resetHour: 20, resetMinute: 0, autoOpenEnabled: false, openHour: 6, openMinute: 0, openCollectorName: '', openPayCash: false, openPayInstapay: false, openInstapayNumber: '' };
-    S.vapidPublicKey    = r.vapidPublicKey    || '';
 
     try { sessionStorage.setItem('fattar_menu', JSON.stringify(S.menu)); } catch(e) {}
 

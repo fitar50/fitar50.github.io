@@ -35,9 +35,6 @@ const S = {
   restaurants: [],
   activeRestaurantId: null,
   paymentInfo: { collectorName: '', paymentCash: false, paymentInstapay: false, instapayNumber: '' },
-  schedule: { resetHour: 20, resetMinute: 0, autoOpenEnabled: false, openHour: 6, openMinute: 0, openCollectorName: '', openPayCash: false, openPayInstapay: false, openInstapayNumber: '' },
-  vapidPublicKey: '',
-  _pushSubName: null,
 
   // Manager-only. Carries instapay_number per person; never used by user screens.
   namesAdmin: [],
@@ -457,13 +454,10 @@ document.addEventListener('click', e => {
     case 'doLock':           doLock();           break;
     case 'doReset':          doReset();          break;
     case 'doToggleOrdering': doToggleOrdering(); break;
-    case 'enablePush':       enablePush(S.currentName); break;
-    case 'doNotifyArrived':  doNotifyArrived();  break;
     case 'mgrAddName':       mgrAddNewName();    break;
     case 'doSetRestaurant':    doSetRestaurant();    break;
     case 'doSavePayment':      doSavePayment();      break;
     case 'doSaveFeeOverride':  doSaveFeeOverride();  break;
-    case 'doSaveSchedule':     doSaveSchedule();     break;
     case 'doClearFeeOverride': doClearFeeOverride(); break;
     case 'togglePaid': {
       const name = el.dataset.name;
@@ -591,21 +585,6 @@ document.addEventListener('keydown', e => {
 // Show/hide instapay number field when checkbox changes
 document.addEventListener('change', e => {
   if (e.target.id === 'collectorSel') { onCollectorChange(); return; }
-  if (e.target.id === 'autoOpenChk') {
-    const box = document.getElementById('autoOpenBox');
-    if (box) box.style.display = e.target.checked ? 'block' : 'none';
-    return;
-  }
-  if (e.target.id === 'openCollectorSel') {
-    const wrap = document.getElementById('openCollectorOtherWrap');
-    if (wrap) wrap.style.display = e.target.value === '__other__' ? 'block' : 'none';
-    return;
-  }
-  if (e.target.id === 'openInstapay') {
-    const row = document.getElementById('openInstapayRow');
-    if (row) row.style.display = e.target.checked ? 'block' : 'none';
-    return;
-  }
   if (e.target.id === 'payInstapay') {
     const row = document.getElementById('instapayRow');
     if (row) row.style.display = e.target.checked ? 'block' : 'none';
