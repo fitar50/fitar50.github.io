@@ -3,7 +3,7 @@
 // BUMP CACHE_NAME ON EVERY DEPLOY, and bump the matching ?v= strings in
 // index.html at the same time. Those two are the entire defence against the
 // original bug where a stale build stayed pinned in people's browsers.
-const CACHE_NAME = 'fitar-v20';
+const CACHE_NAME = 'fitar-v22';
 
 self.addEventListener('install', e => {
   // Take over immediately instead of waiting for every old tab to close.
@@ -79,5 +79,38 @@ self.addEventListener('fetch', e => {
           .then(cached => cached || caches.match('./index.html', { ignoreSearch: true }))
           .then(res => res || Response.error())
       )
+  );
+});
+
+
+// ── Web Push ─────────────────────────────────────────────────────────────────
+// Fires even when the app is closed (on Android; on iOS only when installed to
+// the home screen). Shows the "food arrived" notification pushed by the server.
+self.addEventListener('push', event => {
+  let data = { title: '🍽️ الأكل وصل!', body: 'روح استلم طلبك 😋' };
+  try { if (event.data) data = Object.assign(data, event.data.json()); } catch (_) {}
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body:     data.body,
+      icon:     './icons/icon-192.png',
+      badge:    './icons/icon-192.png',
+      dir:      'rtl',
+      lang:     'ar',
+      tag:      'fitar-arrived',
+      renotify: true,
+      vibrate:  [200, 100, 200],
+      data:     { url: './' }
+    })
+  );
+});
+
+// Tapping the notification focuses an open tab or opens the app.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) { if ('focus' in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow('./');
+    })
   );
 });

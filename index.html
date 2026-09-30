@@ -11,8 +11,8 @@
 <!-- ?v= MUST be bumped on every deploy, together with CACHE_NAME in sw.js.
      Without it GitHub Pages' HTTP caching pins these files in the browser and
      users keep running old code for days. That was the original bug. -->
-<link rel="stylesheet" href="css/style.css?v=20">
-<link rel="stylesheet" href="css/additions.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=22">
+<link rel="stylesheet" href="css/additions.css?v=22">
 </head>
 <body>
 <div id="app">
@@ -116,6 +116,7 @@
   <div class="sub-items-card" id="subList"></div>
   <div id="subTotalBox"></div>
   <div id="subPaymentBox"></div>
+  <div id="pushPrompt" style="display:none;"></div>
   <div class="screen-actions">
     <button class="btn btn-outline screen-act-btn" data-action="editMyOrder">✏️ تعديل</button>
     <button class="btn btn-outline screen-act-btn" data-action="orderForAnother">➕ اطلب لحد تاني</button>
@@ -224,6 +225,10 @@
   <div class="section-title">مطعم اليوم وإعدادات الدفع</div>
   <div id="mgrConfigSection"></div>
 
+  <!-- Auto reset / auto open schedule (rendered by manager.js _renderMgrSchedule) -->
+  <div class="section-title">المواعيد التلقائية</div>
+  <div id="mgrScheduleSection"></div>
+
   <div class="refresh-row">
     <span class="last-updated" id="lastUpdated"></span>
     <button class="refresh-btn" data-action="refreshManager">🔄 تحديث</button>
@@ -320,13 +325,14 @@
 
 </div><!-- #app -->
 
-<script src="js/config.js?v=20"></script>
-<script src="js/utils.js?v=20"></script>
-<script src="js/api.js?v=20"></script>
-<script src="js/screens.js?v=20"></script>
-<script src="js/manager.js?v=20"></script>
-<script src="js/supermanager.js?v=20"></script>
-<script src="js/app.js?v=20"></script>
+<script src="js/config.js?v=22"></script>
+<script src="js/utils.js?v=22"></script>
+<script src="js/api.js?v=22"></script>
+<script src="js/push.js?v=22"></script>
+<script src="js/screens.js?v=22"></script>
+<script src="js/manager.js?v=22"></script>
+<script src="js/supermanager.js?v=22"></script>
+<script src="js/app.js?v=22"></script>
 
 <script>
 // Service worker registration.
