@@ -947,10 +947,10 @@ async function doNotifyOrderingOpen() {
   showConfirm('تبعت إشعار لكل الموظفين إن الطلبات اتفتحت؟', async () => {
     try {
       const r = await api('notifyOrderingOpen', { ref: S.mgrKey });
-      if ((r.sent || 0) === 0) {
+      if ((r.people ?? r.sent ?? 0) === 0) {
         showToast('محدش فعّل الإشعارات لسه');
       } else {
-        showToast(`تم إرسال الإشعار ✓ (${r.sent})`);
+        showToast(`تم إرسال الإشعار ✓ (${r.people ?? r.sent} شخص)`);
       }
     } catch (e) {
       showToast(e.message || 'فشل إرسال الإشعار ❌');
@@ -963,10 +963,10 @@ async function doNotifyArrived() {
   showConfirm('تبعت إشعار لكل اللي طلبوا إن الأكل وصل؟', async () => {
     try {
       const r = await api('notifyArrived', { ref: S.mgrKey });
-      if ((r.sent || 0) === 0) {
+      if ((r.people ?? r.sent ?? 0) === 0) {
         showToast('محدش فعّل الإشعارات من اللي طلبوا');
       } else {
-        showToast(`تم إرسال الإشعار ✓ (${r.sent})`);
+        showToast(`تم إرسال الإشعار ✓ (${r.people ?? r.sent} شخص)`);
       }
     } catch (e) {
       showToast(e.message || 'فشل إرسال الإشعار ❌');
