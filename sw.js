@@ -3,7 +3,7 @@
 // BUMP CACHE_NAME ON EVERY DEPLOY, and bump the matching ?v= strings in
 // index.html at the same time. Those two are the entire defence against the
 // original bug where a stale build stayed pinned in people's browsers.
-const CACHE_NAME = 'fitar-v26';
+const CACHE_NAME = 'fitar-v27';
 
 self.addEventListener('install', e => {
   // Take over immediately instead of waiting for every old tab to close.
@@ -108,13 +108,18 @@ self.addEventListener('push', event => {
   );
 });
 
-// Tapping the notification focuses an open tab or opens the app.
+// Tapping the notification focuses an existing app tab, or opens one when the
+// browser is closed. self.registration.scope is the canonical app URL so we
+// never accidentally focus an unrelated window from the same origin.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const appUrl = self.registration.scope;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
-      if (self.clients.openWindow) return self.clients.openWindow('./');
+      for (const c of list) {
+        if (c.url.startsWith(appUrl) && 'focus' in c) return c.focus();
+      }
+      return self.clients.openWindow(appUrl);
     })
   );
 });
