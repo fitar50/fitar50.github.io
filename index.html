@@ -1,1371 +1,365 @@
-// index.js
-const express = require('express');
-const cors    = require('cors');
-const db      = require('./db');
-const {
-  normAr, normNote, checkMgr, checkSuperMgr, cleanItemsForRestaurant
-} = require('./middleware');
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فطار الشغل 🥙</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F5A623">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<!-- ?v= MUST be bumped on every deploy, together with CACHE_NAME in sw.js.
+     Without it GitHub Pages' HTTP caching pins these files in the browser and
+     users keep running old code for days. That was the original bug. -->
+<link rel="stylesheet" href="css/style.css?v=26">
+<link rel="stylesheet" href="css/additions.css?v=26">
+</head>
+<body>
+<div id="app">
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+<!-- ======================== LOADING ======================== -->
+<div id="screen-loading" class="screen active">
+  <div class="spinner"></div>
+  <p style="color:var(--grey);font-size:14px;">جاري التحميل...</p>
+</div>
 
-// ── Web Push (VAPID) ─────────────────────────────────────────────────────────
-// Push stays fully disabled until BOTH keys are set as env vars on Railway:
-//   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY  (generate with: npx web-push generate-vapid-keys)
-//   VAPID_SUBJECT     (optional, a mailto: or https: URL)
-// If web-push isn't installed or keys are missing, the server still boots and the
-// notify action reports it's off — nothing else breaks.
-let webpush = null;
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY  || '';
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT     || 'mailto:fitar@example.com';
-try {
-  if (VAPID_PUBLIC && VAPID_PRIVATE) {
-    webpush = require('web-push');
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
-    console.log('Web Push enabled');
-  } else {
-    console.log('Web Push disabled (VAPID keys not set)');
-  }
-} catch (e) {
-  webpush = null;
-  console.log('Web Push disabled (web-push not installed):', e.message);
-}
+<!-- ======================== ERROR / RETRY ======================== -->
+<div id="screen-error" class="screen">
+  <div class="error-screen">
+    <div class="e-icon">📡</div>
+    <h2>فشل الاتصال</h2>
+    <p>تأكد من الإنترنت وحاول تاني</p>
+    <button class="btn btn-primary" data-action="retryInit" style="max-width:200px;">🔄 إعادة المحاولة</button>
+  </div>
+</div>
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
-app.use(express.json());
+<!-- ======================== NOT OPEN SCREEN ======================== -->
+<div id="screen-not-open" class="screen">
+  <div class="hdr">
+    <h1>🥙 فطار الشغل</h1>
+    <p>صباح الخير!</p>
+  </div>
+  <div class="not-open-screen">
+    <div class="not-open-icon">⏳</div>
+    <h2 class="not-open-title">الطلبات ما اتفتحتش لسه</h2>
+    <p class="not-open-sub">لما المدير يفتح الطلبات<br>هتقدر تختار اللي تطلبه 🥙</p>
+  </div>
+  <div class="app-footer">
+    <a class="footer-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+  </div>
+</div>
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SSE — real-time push to connected browsers
-// ─────────────────────────────────────────────────────────────────────────────
-const sseClients = new Set();
+<!-- ======================== NAME SCREEN ======================== -->
+<div id="screen-name" class="screen">
+  <div class="hdr">
+    <h1>🥙 فطار الشغل</h1>
+    <p>اختار اسمك وابدأ الطلب</p>
+  </div>
+  <div id="todayRestaurantBanner" style="display:none;margin:14px 14px 0;background:#e8f5e9;color:#1b5e20;padding:12px 16px;border-radius:12px;font-size:15px;font-weight:800;text-align:center;border:1.5px solid #a5d6a7;"></div>
+  <div id="orderingForBanner" style="display:none;margin:14px 14px 0;background:#fff3e0;color:#e65100;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;text-align:center;border:1.5px solid #ffcc80;"></div>
+  <div id="orderCounter" class="order-counter" style="display:none;"></div>
+  <div class="name-hero">
+    <span class="emoji">🧆</span>
+    <h2>صباح الخير!</h2>
+    <p>اختار اسمك من القايمة</p>
+  </div>
+  <div class="card">
+    <div class="name-body">
+      <label class="field-label">اسمك</label>
+      <div class="sel-wrap">
+        <select id="nameSelect">
+          <option value="">-- اختار --</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" data-action="proceedWithName" style="margin-top:12px;">متابعة ←</button>
+    </div>
+  </div>
+  <div class="app-footer">
+    <a class="footer-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+  </div>
+</div>
 
-app.get('/api/events', async (req, res) => {
-  // CORS must be set explicitly: writeHead replaces all headers, bypassing
-  // the cors() middleware. Without this, cross-origin EventSource fails.
-  const origin = process.env.CORS_ORIGIN || '*';
-  res.writeHead(200, {
-    'Content-Type':  'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection':    'keep-alive',
-    'X-Accel-Buffering': 'no',           // nginx/Railway: don't buffer SSE
-    'Access-Control-Allow-Origin': origin,
+<!-- ======================== ORDER SCREEN ======================== -->
+<div id="screen-order" class="screen">
+  <div class="hdr" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;">
+    <button data-action="goBackToName" style="background:none;border:2px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:inherit;flex-shrink:0;">← رجوع</button>
+    <div style="flex:1;text-align:center;">
+      <h1 id="orderTitle">اختار طلبك 🥙</h1>
+      <p id="orderSub" style="font-size:12px;opacity:0.85;margin-top:3px;">اختار من القايمة اللي تحبها</p>
+    </div>
+    <div style="width:72px;"></div>
+  </div>
+  <div class="card" id="menuContainer"></div>
+  <div class="sticky-foot">
+    <div class="total-bar">
+      <span>إجمالي طلبك:</span>
+      <strong id="orderTotal">0 جنيه</strong>
+    </div>
+    <button id="clearOrderBtn" class="btn" data-action="clearOrder" style="display:none;background:#fff0f0;color:#c62828;border:1.5px solid #ffcdd2;margin-bottom:8px;font-size:13px;padding:10px;">🗑 مسح الكل</button>
+    <button class="btn btn-primary" id="submitBtn" data-action="submitOrder" disabled>
+      تأكيد الطلب ✓
+    </button>
+  </div>
+</div>
+
+<!-- ======================== SUBMITTED SCREEN ======================== -->
+<div id="screen-submitted" class="screen">
+  <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
+  <!-- Compact hero: icon + name + time in one row -->
+  <div class="sub-hero">
+    <span class="sub-hero-icon">✅</span>
+    <div class="sub-hero-text">
+      <span class="sub-hero-name" id="subName"></span>
+      <span class="sub-hero-time" id="subLabel">تم حفظ طلبك بنجاح!</span>
+    </div>
+  </div>
+  <div class="sub-items-card" id="subList"></div>
+  <div id="subTotalBox"></div>
+  <div id="subPaymentBox"></div>
+  <div id="pushPrompt" style="display:none;"></div>
+  <div class="screen-actions">
+    <button class="btn btn-outline screen-act-btn" data-action="editMyOrder">✏️ تعديل</button>
+    <button class="btn btn-outline screen-act-btn" data-action="orderForAnother">➕ اطلب لحد تاني</button>
+  </div>
+  <div class="app-footer">
+    <a class="footer-link footer-link-danger" data-action="cancelMyOrder" id="cancelOrderBtn">🚫 إلغاء طلبي</a>
+    <a class="footer-link" data-action="goBackToName">🚪 تسجيل الخروج</a>
+    <a class="footer-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+  </div>
+</div>
+
+<!-- ==================== REPEAT (same as last time?) ==================== -->
+<div id="screen-repeat" class="screen">
+  <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
+  <div class="big-icon">🔁</div>
+  <p class="sub-name" id="repeatName"></p>
+  <p class="sub-label">تحب تطلب نفس طلب المرة اللي فاتت؟</p>
+  <div class="card" style="margin-bottom:12px;">
+    <div style="padding:14px 16px 4px;" id="repeatList"></div>
+  </div>
+  <div id="repeatTotalBox"></div>
+  <div class="screen-actions" style="margin-top:12px;">
+    <button class="btn btn-primary screen-act-btn" data-action="submitSameOrder">✅ ابعت نفس الطلب</button>
+    <button class="btn btn-outline screen-act-btn" data-action="newOrderInstead">➕ اطلب من جديد</button>
+  </div>
+  <div class="app-footer">
+    <a class="footer-link" data-action="goBackToName">🚪 تسجيل الخروج</a>
+    <a class="footer-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+  </div>
+</div>
+<div id="screen-closed" class="screen">
+  <div class="hdr"><h1>🥙 فطار الشغل</h1></div>
+  <div class="lock-icon">🔒</div>
+  <p class="lock-title">الطلبات اتبعتت!</p>
+  <p class="lock-sub" id="closedTime"></p>
+
+  <div id="closedHasOrder" style="display:none;">
+    <div class="section-title">طلبك</div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="padding:14px 16px 4px;" id="closedList"></div>
+    </div>
+    <div id="closedTotalBox"></div>
+    <div id="closedPaymentBox"></div>
+  </div>
+
+  <div id="closedNoOrder">
+    <div class="card">
+      <div class="empty">
+        <div class="e-icon">🔍</div>
+        <p class="lock-title">اختار اسمك عشان تشوف طلبك وكام هتدفع</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px;">
+      <div class="name-body">
+        <label class="field-label">اسمك</label>
+        <div class="sel-wrap">
+          <select id="closedNameSelect">
+            <option value="">-- اختار --</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="app-footer">
+    <a class="footer-link" id="closedLogoutLink" data-action="goHome">🚪 تسجيل الخروج</a>
+    <a class="footer-link" data-action="showMgrLogin">🔑 دخول المدير</a>
+  </div>
+</div>
+
+<!-- ======================== MANAGER LOGIN ======================== -->
+<div id="screen-mgr-login" class="screen">
+  <div class="hdr hdr-dark"><h1>🔑 لوحة التحكم</h1></div>
+  <div class="login-wrap">
+    <div class="login-icon">👨‍💼</div>
+    <p class="login-title">دخول المدير</p>
+    <p class="login-sub">ادخل كود التحقق الخاص بيك</p>
+  </div>
+  <div class="card">
+    <div class="name-body">
+      <label class="field-label">كود التحقق</label>
+      <input type="password" id="mgrCodeInput" placeholder="• • • • • •">
+      <button class="btn btn-primary" data-action="doManagerLogin" style="margin-top:12px;">دخول</button>
+    </div>
+  </div>
+  <div class="app-footer">
+    <a class="footer-link" data-action="exitManager">↩ رجوع لصفحة الطلب</a>
+  </div>
+</div>
+
+<!-- ======================== MANAGER DASHBOARD ======================== -->
+<div id="screen-manager" class="screen">
+  <div class="hdr hdr-dark" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;">
+    <button data-action="exitManager" style="background:none;border:2px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:inherit;">← خروج</button>
+    <h1 style="flex:1;text-align:center;">📋 لوحة المدير</h1>
+    <div style="width:72px;"></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-val" id="sPeople">0</div><div class="stat-lbl">أشخاص</div></div>
+    <div class="stat"><div class="stat-val" id="sFood">0</div><div class="stat-lbl">طعام ج</div></div>
+    <div class="stat"><div class="stat-val" id="sTotal">0</div><div class="stat-lbl">الإجمالي ج</div></div>
+  </div>
+
+  <!-- Restaurant + payment config (rendered by manager.js _renderMgrConfig) -->
+  <div class="section-title">مطعم اليوم وإعدادات الدفع</div>
+  <div id="mgrConfigSection"></div>
+
+  <!-- Auto reset / auto open schedule (rendered by manager.js _renderMgrSchedule) -->
+  <div class="section-title">المواعيد التلقائية</div>
+  <div id="mgrScheduleSection"></div>
+
+  <div class="refresh-row">
+    <span class="last-updated" id="lastUpdated"></span>
+    <button class="refresh-btn" data-action="refreshManager">🔄 تحديث</button>
+  </div>
+
+  <!-- Total order summary -->
+  <div class="section-title">ملخص الطلب الكلي (للمطعم)</div>
+  <div class="total-summary" id="totalSummary"></div>
+
+  <!-- Per-person orders -->
+  <div class="section-title">طلبات الأشخاص</div>
+  <!-- Manager-only payment tracking. Must never appear on any user screen. -->
+  <div id="paidSummary" style="display:none;"></div>
+  <div id="ordersList"></div>
+
+  <!-- Add order for person -->
+  <div class="section-title">إضافة طلب لشخص</div>
+  <div class="add-person-card">
+    <div class="sel-wrap"><select id="mgrPersonSel"><option value="">-- اختار اسم --</option></select></div>
+    <button class="inline-btn" data-action="mgrAddPerson" style="width:100%;margin-top:0;">➕ فتح الطلب</button>
+  </div>
+
+  <!-- Names management -->
+  <div class="section-title">إدارة الأسماء</div>
+  <div class="card" id="namesMgmtList" style="margin:0 14px;padding:0;"></div>
+  <div class="add-name-card">
+    <input type="text" id="mgrNewNameInput" placeholder="اسم جديد" maxlength="30">
+    <button class="inline-btn" data-action="mgrAddName">➕ إضافة اسم</button>
+  </div>
+
+  <!-- Actions (rendered by _renderMgrActions, includes super mgr link) -->
+  <div class="section-title">إجراءات</div>
+  <div class="mgr-actions" id="mgrActions"></div>
+</div>
+
+<!-- ======================== SUPER MANAGER LOGIN ======================== -->
+<div id="screen-supermgr-login" class="screen">
+  <div class="hdr hdr-dark"><h1>⚙️ إدارة المطاعم</h1></div>
+  <div class="login-wrap">
+    <div class="login-icon">🔧</div>
+    <p class="login-title">دخول السوبر مدير</p>
+    <p class="login-sub">لإدارة المطاعم والقوائم والأسعار</p>
+  </div>
+  <div class="card">
+    <div class="name-body">
+      <label class="field-label">كود السوبر مدير</label>
+      <input type="password" id="superMgrCodeInput" placeholder="• • • • • •">
+      <button class="btn btn-primary" data-action="doSuperMgrLogin" style="margin-top:12px;">دخول</button>
+    </div>
+  </div>
+  <div class="app-footer">
+    <a class="footer-link" data-action="exitSuperMgr">↩ رجوع</a>
+  </div>
+</div>
+
+<!-- ======================== SUPER MANAGER DASHBOARD ======================== -->
+<div id="screen-supermgr" class="screen">
+  <div class="hdr hdr-dark" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;">
+    <button data-action="exitSuperMgr" style="background:none;border:2px solid rgba(255,255,255,.4);border-radius:8px;color:#fff;font-size:13px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:inherit;">← خروج</button>
+    <h1 style="flex:1;text-align:center;">⚙️ إدارة المطاعم</h1>
+    <div style="width:72px;"></div>
+  </div>
+  <!-- Content rendered dynamically by renderSuperMgrDashboard() -->
+  <div id="superMgrContent" style="padding-bottom:40px;"></div>
+</div>
+
+<!-- ======================== EDIT MODAL ======================== -->
+<div id="editModal">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3 id="modalTitle">تعديل الطلب</h3>
+      <button class="modal-close" data-action="closeModal">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" id="modalSaveBtn" data-action="saveModal">حفظ التعديلات ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== CONFIRM SHEET ======================== -->
+<div id="confirmModal">
+  <div class="confirm-sheet">
+    <p id="confirmMessage" class="confirm-msg"></p>
+    <div class="confirm-btns">
+      <button class="btn btn-outline" data-action="cancelConfirm">لا، إلغاء</button>
+      <button class="btn btn-primary" data-action="doConfirm">تأكيد ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+</div><!-- #app -->
+
+<script src="js/config.js?v=26"></script>
+<script src="js/utils.js?v=26"></script>
+<script src="js/api.js?v=26"></script>
+<script src="js/push.js?v=26"></script>
+<script src="js/screens.js?v=26"></script>
+<script src="js/manager.js?v=26"></script>
+<script src="js/supermanager.js?v=26"></script>
+<script src="js/app.js?v=26"></script>
+
+<script>
+// Service worker registration.
+// This was MISSING: sw.js existed but nothing ever registered it, so the
+// network-first caching strategy never ran. Any old cache-first worker left
+// registered in someone's browser was therefore never replaced, which is why
+// people kept getting a stale build until they cleared their browser data.
+if ('serviceWorker' in navigator) {
+  // Whether a worker was already in charge BEFORE this page load. Used below
+  // so the very first install does not trigger a pointless reload.
+  var _hadController = !!navigator.serviceWorker.controller;
+  var _reloading = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    // A NEW worker took over an already-controlled page: the code running now
+    // is stale, so reload once to pick up the new build.
+    if (!_hadController || _reloading) return;
+    _reloading = true;
+    window.location.reload();
   });
 
-  // Send current state immediately so the client is up to date on connect
-  try {
-    const snapshot = await _buildStatusPayload();
-    res.write('data: ' + JSON.stringify(snapshot) + '\n\n');
-  } catch (e) { /* connect anyway */ }
-
-  sseClients.add(res);
-
-  // Heartbeat every 25 s keeps Railway/proxies from closing the connection
-  const hb = setInterval(() => {
-    try { res.write(':hb\n\n'); } catch (e) { clearInterval(hb); sseClients.delete(res); }
-  }, 25000);
-
-  req.on('close', () => { sseClients.delete(res); clearInterval(hb); });
-});
-
-async function _buildStatusPayload() {
-  const [cfgRes, countRes] = await Promise.all([
-    db.query("SELECT key, value FROM config"),
-    db.query("SELECT COUNT(*) FROM orders")
-  ]);
-  const cfg = {};
-  cfgRes.rows.forEach(r => { cfg[r.key] = r.value; });
-
-  const activeId = parseInt(cfg.active_restaurant_id) || null;
-  const noteSuggestions = {};
-  if (activeId) {
-    const nRes = await db.query(
-      "SELECT item_name, note FROM note_suggestions WHERE restaurant_id = $1 ORDER BY item_name, id",
-      [activeId]
-    );
-    nRes.rows.forEach(r => {
-      if (!noteSuggestions[r.item_name]) noteSuggestions[r.item_name] = [];
-      noteSuggestions[r.item_name].push(r.note);
-    });
-  }
-
-  return {
-    locked:       cfg.locked       === 'true',
-    lockTime:     cfg.lockTime     || '',
-    orderingOpen: cfg.orderingOpen === 'true',
-    ordersCount:  parseInt(countRes.rows[0].count, 10),
-    deliveryFee:  await getEffectiveDeliveryFee(cfg),
-    paymentInfo:  paymentInfoFromCfg(cfg),
-    noteSuggestions,
-  };
-}
-
-function broadcast() {
-  if (sseClients.size === 0) return;
-  _buildStatusPayload()
-    .then(payload => {
-      const msg = 'data: ' + JSON.stringify(payload) + '\n\n';
-      for (const client of sseClients) {
-        try { client.write(msg); } catch (e) { sseClients.delete(client); }
-      }
-    })
-    .catch(() => {});
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MIGRATION
-// Runs on every boot. Every statement must be idempotent. Never DROP anything.
-// ─────────────────────────────────────────────────────────────────────────────
-async function migrate() {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS config (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL DEFAULT ''
-    )
-  `);
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS names (
-      name TEXT PRIMARY KEY
-    )
-  `);
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS restaurants (
-      id         SERIAL  PRIMARY KEY,
-      name       TEXT    NOT NULL UNIQUE,
-      sort_order INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS menu (
-      id            SERIAL  PRIMARY KEY,
-      restaurant_id INTEGER REFERENCES restaurants(id),
-      category      TEXT    NOT NULL,
-      name          TEXT    NOT NULL,
-      price         INTEGER NOT NULL,
-      sort_order    INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS orders (
-      name        TEXT        PRIMARY KEY,
-      items       JSONB       NOT NULL DEFAULT '[]',
-      ordered_by  TEXT        NOT NULL DEFAULT '',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  // ── Plan 01: new columns ──────────────────────────────────────────────────
-  await db.query(`ALTER TABLE menu        ADD COLUMN IF NOT EXISTS restaurant_id    INTEGER REFERENCES restaurants(id)`);
-  await db.query(`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS delivery_fee     INTEGER NOT NULL DEFAULT 30`);
-  await db.query(`ALTER TABLE names       ADD COLUMN IF NOT EXISTS instapay_number  TEXT    NOT NULL DEFAULT ''`);
-  await db.query(`ALTER TABLE orders      ADD COLUMN IF NOT EXISTS paid             BOOLEAN NOT NULL DEFAULT FALSE`);
-  // Plan 9.3: `updated_at` tracks edits so `created_at` can stay the true
-  // placement time. Editing an order must NOT reshuffle the manager's list.
-  await db.query(`ALTER TABLE orders      ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-
-  // "Same order as last time?": the last submitted order per person, kept across
-  // the daily reset (which only clears `orders`). Read at name selection.
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS last_orders (
-      name       TEXT        PRIMARY KEY,
-      items      JSONB       NOT NULL DEFAULT '[]',
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  // ── Plan 01: note suggestions ─────────────────────────────────────────────
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS note_suggestions (
-      id            SERIAL      PRIMARY KEY,
-      restaurant_id INTEGER     NOT NULL REFERENCES restaurants(id),
-      item_name     TEXT        NOT NULL,
-      note          TEXT        NOT NULL,
-      note_norm     TEXT        NOT NULL,
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await db.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS note_suggestions_uniq
-      ON note_suggestions (restaurant_id, item_name, note_norm)
-  `);
-
-  // ── Web Push subscriptions ──────────────────────────────────────────────────
-  // One row per device/browser. endpoint is the push service URL (unique).
-  // `name` ties the device to the person so we can notify only those who
-  // ordered today. Kept across the daily reset (device registration is reused).
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS push_subscriptions (
-      endpoint   TEXT        PRIMARY KEY,
-      name       TEXT        NOT NULL DEFAULT '',
-      sub        JSONB       NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  // ── Config rows ───────────────────────────────────────────────────────────
-  await db.query(`
-    INSERT INTO config (key, value) VALUES
-      ('locked',                'false'),
-      ('lockTime',              ''),
-      ('orderingOpen',          'false'),
-      ('active_restaurant_id',  ''),
-      ('collector_name',        ''),
-      ('payment_cash',          'false'),
-      ('payment_instapay',      'false'),
-      ('instapay_number',       ''),
-      ('delivery_fee_override', ''),
-      ('collector_instapay',    ''),
-      ('last_reset_period',     ''),
-      ('reset_hour',            '20'),
-      ('reset_minute',          '0'),
-      ('auto_open_enabled',     'false'),
-      ('open_hour',             '6'),
-      ('open_minute',           '0'),
-      ('open_collector_name',   ''),
-      ('open_pay_cash',         'false'),
-      ('open_pay_instapay',     'false'),
-      ('open_instapay_number',  ''),
-      ('last_open_period',      '')
-    ON CONFLICT (key) DO NOTHING
-  `);
-
-  // One-time carry-over: the old 'instapay_number' key is superseded by
-  // 'collector_instapay'. Idempotent - once collector_instapay is non-empty
-  // this never fires again. The old row is left in place, not deleted.
-  // Done in two plain statements rather than one correlated UPDATE so it works
-  // on every Postgres-compatible engine.
-  const { rows: carryRows } = await db.query(
-    "SELECT key, value FROM config WHERE key = 'instapay_number' OR key = 'collector_instapay'"
-  );
-  const carry = {};
-  carryRows.forEach(r => { carry[r.key] = r.value; });
-  if ((carry.collector_instapay || '') === '' && (carry.instapay_number || '') !== '') {
-    await db.query(
-      "UPDATE config SET value = $1 WHERE key = 'collector_instapay'",
-      [carry.instapay_number]
-    );
-  }
-
-  // Upgrade path from the single-restaurant version: adopt orphaned menu rows.
-  const { rows: orphans } = await db.query(`SELECT COUNT(*) FROM menu WHERE restaurant_id IS NULL`);
-  if (parseInt(orphans[0].count, 10) > 0) {
-    const { rows: exists } = await db.query(`SELECT id FROM restaurants ORDER BY id LIMIT 1`);
-    let restId;
-    if (exists.length > 0) {
-      restId = exists[0].id;
-    } else {
-      const { rows } = await db.query(
-        `INSERT INTO restaurants (name, sort_order) VALUES ('المطعم الافتراضي', 1) RETURNING id`
-      );
-      restId = rows[0].id;
-    }
-    await db.query(`UPDATE menu SET restaurant_id = $1 WHERE restaurant_id IS NULL`, [restId]);
-    await db.query(
-      `UPDATE config SET value = $1 WHERE key = 'active_restaurant_id' AND value = ''`,
-      [String(restId)]
-    );
-  }
-
-  console.log('✓ DB migration complete');
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-// The config table holds ~10 rows, so we always fetch it whole and filter in
-// JS. Cheaper than it looks and avoids array-parameter SQL entirely.
-async function readConfig(keys) {
-  const { rows } = await db.query('SELECT key, value FROM config');
-  const cfg = {};
-  rows.forEach(r => {
-    if (!keys || keys.includes(r.key)) cfg[r.key] = r.value;
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js')
+      .then(function (reg) { reg.update(); })   // check for a new build every load
+      .catch(function () { /* SW unavailable: the ?v= strings still protect us */ });
   });
-  return cfg;
 }
-
-// Reads from 'collector_instapay' (NOT the legacy 'instapay_number' key).
-function paymentInfoFromCfg(cfg) {
-  return {
-    collectorName:   cfg.collector_name     || '',
-    paymentCash:     cfg.payment_cash       === 'true',
-    paymentInstapay: cfg.payment_instapay   === 'true',
-    instapayNumber:  cfg.collector_instapay || ''
-  };
-}
-
-// Effective delivery fee for today, in EGP. Daily override wins over the
-// active restaurant's own fee. Returns 0 when no restaurant is selected.
-// Never returns null/undefined.
-async function getEffectiveDeliveryFee(cfg) {
-  const override = String(cfg.delivery_fee_override || '').trim();
-  if (override !== '') {
-    const n = parseInt(override, 10);
-    if (Number.isFinite(n) && n >= 0) return n;
-  }
-  const activeId = parseInt(cfg.active_restaurant_id) || null;
-  if (!activeId) return 0;
-  const { rows } = await db.query('SELECT delivery_fee FROM restaurants WHERE id = $1', [activeId]);
-  return rows.length ? rows[0].delivery_fee : 0;
-}
-
-// Bug 9.2: destructive menu edits (rename/delete an item, rename/delete a
-// category) on TODAY's restaurant while orders exist would strand those orders:
-// the item vanishes from the manager's edit modal, prices at 0, and is dropped
-// by cleanItemsForRestaurant the moment the manager re-saves that person's
-// order. Orders only ever belong to the active restaurant, so we block only
-// when the edit targets it AND orders are live - mirroring the restaurant-switch
-// guard. Price-only edits stay allowed (orders are snapshots, unaffected).
-async function activeRestaurantHasOrders(restaurantId) {
-  const rid = parseInt(restaurantId);
-  if (!rid) return false;
-  const cfg = await readConfig(['active_restaurant_id']);
-  const activeId = parseInt(cfg.active_restaurant_id) || null;
-  if (!activeId || activeId !== rid) return false;
-  const { rows } = await db.query('SELECT COUNT(*) FROM orders');
-  return parseInt(rows[0].count, 10) > 0;
-}
-const MENU_LOCKED_MSG = 'في طلبات على المطعم ده — اعمل تصفير الطلبات الأول';
-
-// ─────────────────────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => res.json({ ok: true }));
-
-// ── Daily auto-reset at 20:00 Africa/Cairo ────────────────────────────────────
-// Railway can sleep, so we don't trust a wall-clock timer. Instead every state
-// read checks whether the 20:00 Cairo boundary has been crossed since the last
-// reset and, if so, wipes the day exactly like a manual تصفير. DST-aware: the
-// boundary is always local 8pm (UTC+2 winter, UTC+3 summer).
-// Cairo wall-clock "period index" for a daily boundary at hour:minute. The index
-// increments exactly when local time crosses that boundary each day. DST-aware.
-function cairoPeriodIndex(hour, minute, now) {
-  const parts = {};
-  new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit',
-    day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(now || new Date()).forEach(p => {
-    if (p.type !== 'literal') parts[p.type] = p.value;
-  });
-  let h = parseInt(parts.hour, 10); if (h === 24) h = 0;
-  const wallMs = Date.UTC(+parts.year, +parts.month - 1, +parts.day, h, parseInt(parts.minute, 10));
-  const offset = ((hour * 60) + minute) * 60000;
-  return Math.floor((wallMs - offset) / (24 * 3600 * 1000));
-}
-
-function cfgInt(v, def) { const n = parseInt(v, 10); return Number.isFinite(n) ? n : def; }
-function upsertCfg(key, val) {
-  return db.query(
-    "INSERT INTO config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
-    [key, val]
-  );
-}
-
-// The order-clearing half of a reset (same effect as the manual 'reset' action).
-async function performReset() {
-  await db.query('DELETE FROM orders');
-  await Promise.all([
-    db.query("UPDATE config SET value = 'false' WHERE key = 'locked'"),
-    db.query("UPDATE config SET value = ''      WHERE key = 'lockTime'"),
-    db.query("UPDATE config SET value = 'false' WHERE key = 'orderingOpen'"),
-    db.query("UPDATE config SET value = ''      WHERE key = 'collector_name'"),
-    db.query("UPDATE config SET value = 'false' WHERE key = 'payment_cash'"),
-    db.query("UPDATE config SET value = 'false' WHERE key = 'payment_instapay'"),
-    db.query("UPDATE config SET value = ''      WHERE key = 'instapay_number'"),
-    db.query("UPDATE config SET value = ''      WHERE key = 'collector_instapay'"),
-    db.query("UPDATE config SET value = ''      WHERE key = 'delivery_fee_override'")
-  ]);
-}
-
-let _autoResetChecking = false;
-async function maybeAutoReset() {
-  if (_autoResetChecking) return false;   // in-process guard against a double reset
-  _autoResetChecking = true;
-  try {
-    const { rows } = await db.query("SELECT key, value FROM config WHERE key IN ('last_reset_period','reset_hour','reset_minute')");
-    const c = {}; rows.forEach(r => c[r.key] = r.value);
-    const rh = cfgInt(c.reset_hour, 20), rm = cfgInt(c.reset_minute, 0);
-    const stored = String(c.last_reset_period || '');
-    const cur    = String(cairoPeriodIndex(rh, rm));
-    if (stored === '') {
-      // First ever check: adopt the current period WITHOUT wiping live orders.
-      await upsertCfg('last_reset_period', cur);
-      return false;
-    }
-    if (stored !== cur) {
-      await performReset();
-      await upsertCfg('last_reset_period', cur);
-      broadcast();
-      return true;
-    }
-    return false;
-  } catch (e) {
-    return false;
-  } finally {
-    _autoResetChecking = false;
-  }
-}
-
-// Auto-open: at the configured time, open ordering with a preset collector +
-// payment method. Mirrors the manual gate (needs a collector + a method); if the
-// preset is incomplete it marks the day done and skips rather than looping.
-let _autoOpenChecking = false;
-async function maybeAutoOpen() {
-  if (_autoOpenChecking) return false;
-  _autoOpenChecking = true;
-  try {
-    const { rows } = await db.query("SELECT key, value FROM config");
-    const c = {}; rows.forEach(r => c[r.key] = r.value);
-    if (c.auto_open_enabled !== 'true') return false;
-    const oh = cfgInt(c.open_hour, 6), om = cfgInt(c.open_minute, 0);
-    const stored = String(c.last_open_period || '');
-    const cur    = String(cairoPeriodIndex(oh, om));
-    if (stored === '') { await upsertCfg('last_open_period', cur); return false; }
-    if (stored === cur) return false;
-
-    const collector = String(c.open_collector_name || '').trim();
-    const cash      = c.open_pay_cash     === 'true';
-    const instapay  = c.open_pay_instapay === 'true';
-    const inum      = String(c.open_instapay_number || '').trim();
-    // Mark this period done regardless, so we don't retry on every request.
-    await upsertCfg('last_open_period', cur);
-    // Also gate on active restaurant: if none is set, ordering would open
-    // but every submitOrder would fail with the empty-restaurant error.
-    const activeId = parseInt(c.active_restaurant_id) || null;
-    if (!collector || (!cash && !instapay) || (instapay && !inum) || !activeId) return false;
-
-    await Promise.all([
-      upsertCfg('collector_name',     collector),
-      upsertCfg('payment_cash',       cash ? 'true' : 'false'),
-      upsertCfg('payment_instapay',   instapay ? 'true' : 'false'),
-      upsertCfg('collector_instapay', inum),
-      upsertCfg('orderingOpen',       'true'),
-      // Clean orderable state: never auto-open into a leftover locked screen.
-      upsertCfg('locked',             'false'),
-      upsertCfg('lockTime',           '')
-    ]);
-    broadcast();
-    return true;
-  } catch (e) {
-    return false;
-  } finally {
-    _autoOpenChecking = false;
-  }
-}
-
-app.post('/api', async (req, res) => {
-  const { action, ...params } = req.body || {};
-  try {
-    switch (action) {
-
-      // ═══════════════════════════════════════════════════════════════════
-      // PUBLIC READS
-      // PRIVACY: getAll and getOrders are unauthenticated. Their order objects
-      // must contain exactly { name, items, orderedBy }. NEVER add `paid`.
-      // ═══════════════════════════════════════════════════════════════════
-      case 'getAll': {
-        await maybeAutoReset();
-        await maybeAutoOpen();
-        const [cfgRes, restRes, namesRes, ordersRes, countRes] = await Promise.all([
-          db.query("SELECT key, value FROM config"),
-          db.query("SELECT id, name, delivery_fee FROM restaurants ORDER BY sort_order, id"),
-          db.query("SELECT name FROM names ORDER BY name"),
-          db.query("SELECT name, items, ordered_by FROM orders ORDER BY created_at"),
-          db.query("SELECT COUNT(*) FROM orders")
-        ]);
-
-        const cfg = {};
-        cfgRes.rows.forEach(r => { cfg[r.key] = r.value; });
-        const activeId = parseInt(cfg.active_restaurant_id) || null;
-
-        let menuRows = [], noteRows = [];
-        if (activeId) {
-          const [m, n] = await Promise.all([
-            db.query(
-              "SELECT category, name, price FROM menu WHERE restaurant_id = $1 ORDER BY sort_order, id",
-              [activeId]
-            ),
-            db.query(
-              "SELECT item_name, note FROM note_suggestions WHERE restaurant_id = $1 ORDER BY item_name, id",
-              [activeId]
-            )
-          ]);
-          menuRows = m.rows;
-          noteRows = n.rows;
-        }
-
-        const menu = {};
-        menuRows.forEach(r => {
-          if (!menu[r.category]) menu[r.category] = [];
-          menu[r.category].push({ name: r.name, price: r.price });
-        });
-
-        const noteSuggestions = {};
-        noteRows.forEach(r => {
-          if (!noteSuggestions[r.item_name]) noteSuggestions[r.item_name] = [];
-          noteSuggestions[r.item_name].push(r.note);
-        });
-
-        // "Same order as last time?": last submitted order per person, kept
-        // across reset. Keyed by name; the client filters to today's menu.
-        const lastRes = await db.query("SELECT name, items FROM last_orders");
-        const lastOrders = {};
-        lastRes.rows.forEach(r => { lastOrders[r.name] = r.items; });
-
-        return res.json({
-          success:            true,
-          menu,
-          names:              namesRes.rows.map(r => r.name),
-          orders:             ordersRes.rows.map(r => ({ name: r.name, items: r.items, orderedBy: r.ordered_by })),
-          locked:             cfg.locked       === 'true',
-          lockTime:           cfg.lockTime     || '',
-          orderingOpen:       cfg.orderingOpen === 'true',
-          ordersCount:        parseInt(countRes.rows[0].count, 10),
-          restaurants:        restRes.rows,
-          activeRestaurantId: activeId,
-          deliveryFee:        await getEffectiveDeliveryFee(cfg),
-          noteSuggestions,
-          lastOrders,
-          paymentInfo:        paymentInfoFromCfg(cfg),
-          schedule: {
-            resetHour:          cfgInt(cfg.reset_hour, 20),
-            resetMinute:        cfgInt(cfg.reset_minute, 0),
-            autoOpenEnabled:    cfg.auto_open_enabled === 'true',
-            openHour:           cfgInt(cfg.open_hour, 6),
-            openMinute:         cfgInt(cfg.open_minute, 0),
-            openCollectorName:  cfg.open_collector_name || '',
-            openPayCash:        cfg.open_pay_cash === 'true',
-            openPayInstapay:    cfg.open_pay_instapay === 'true',
-            openInstapayNumber: cfg.open_instapay_number || ''
-          },
-          vapidPublicKey:     webpush ? VAPID_PUBLIC : ''
-        });
-      }
-
-      case 'getMenu': {
-        const cfg = await readConfig(['active_restaurant_id']);
-        const activeId = parseInt(cfg.active_restaurant_id) || null;
-        let rows = [];
-        if (activeId) {
-          const r = await db.query(
-            "SELECT category, name, price FROM menu WHERE restaurant_id = $1 ORDER BY sort_order, id",
-            [activeId]
-          );
-          rows = r.rows;
-        }
-        const data = {};
-        rows.forEach(r => {
-          if (!data[r.category]) data[r.category] = [];
-          data[r.category].push({ name: r.name, price: r.price });
-        });
-        return res.json({ success: true, data });
-      }
-
-      // Public: returns bare name strings. Used by every user-facing dropdown.
-      // Do NOT change this shape - fillNameDropdown() depends on it.
-      // Manager needs instapay numbers: use getNamesAdmin instead.
-      case 'getNames': {
-        const { rows } = await db.query("SELECT name FROM names ORDER BY name");
-        return res.json({ success: true, data: rows.map(r => r.name) });
-      }
-
-      case 'getStatus': {
-        await maybeAutoReset();
-        await maybeAutoOpen();
-        const [cfgRes, countRes] = await Promise.all([
-          db.query("SELECT key, value FROM config"),
-          db.query("SELECT COUNT(*) FROM orders")
-        ]);
-        const cfg = {};
-        cfgRes.rows.forEach(r => { cfg[r.key] = r.value; });
-        const activeId = parseInt(cfg.active_restaurant_id) || null;
-
-        // Note suggestions ride the poll so a user on the order screen sees
-        // phrasings other people just added, without a full page refresh. Scoped
-        // to the active restaurant, same shape as getAll's noteSuggestions.
-        const noteSuggestions = {};
-        if (activeId) {
-          const nRes = await db.query(
-            "SELECT item_name, note FROM note_suggestions WHERE restaurant_id = $1 ORDER BY item_name, id",
-            [activeId]
-          );
-          nRes.rows.forEach(r => {
-            if (!noteSuggestions[r.item_name]) noteSuggestions[r.item_name] = [];
-            noteSuggestions[r.item_name].push(r.note);
-          });
-        }
-
-        return res.json({
-          success:            true,
-          locked:             cfg.locked       === 'true',
-          lockTime:           cfg.lockTime     || '',
-          orderingOpen:       cfg.orderingOpen === 'true',
-          ordersCount:        parseInt(countRes.rows[0].count, 10),
-          activeRestaurantId: activeId,
-          deliveryFee:        await getEffectiveDeliveryFee(cfg),
-          deliveryOverride:   cfg.delivery_fee_override || '',
-          paymentInfo:        paymentInfoFromCfg(cfg),
-          noteSuggestions
-        });
-      }
-
-      case 'getOrders': {
-        const { rows } = await db.query("SELECT name, items, ordered_by FROM orders ORDER BY created_at");
-        return res.json({
-          success: true,
-          data: rows.map(r => ({ name: r.name, items: r.items, orderedBy: r.ordered_by }))
-        });
-      }
-
-      case 'getOrderingStatus': {
-        const { rows } = await db.query("SELECT value FROM config WHERE key = 'orderingOpen'");
-        return res.json({ success: true, orderingEnabled: rows[0]?.value === 'true' });
-      }
-
-      case 'getRestaurants': {
-        const { rows } = await db.query(
-          "SELECT id, name, delivery_fee FROM restaurants ORDER BY sort_order, id"
-        );
-        return res.json({ success: true, data: rows });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // AUTH
-      // ═══════════════════════════════════════════════════════════════════
-      case 'verify': {
-        const stored = process.env.MGR_CODE || '';
-        return res.json({ success: !!(stored && String(params.ref || '') === stored) });
-      }
-
-      case 'verifySuperMgr': {
-        const stored = process.env.SUPER_MGR_CODE || '';
-        return res.json({ success: !!(stored && String(params.ref || '') === stored) });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // ORDER SUBMISSION
-      // ═══════════════════════════════════════════════════════════════════
-      case 'submitOrder': {
-        const cfg = await readConfig(['locked', 'orderingOpen', 'active_restaurant_id']);
-        if (cfg.locked       === 'true') throw new Error('الطلبات مقفولة');
-        if (cfg.orderingOpen !== 'true') throw new Error('الطلبات مش مفتوحة');
-
-        const activeId = parseInt(cfg.active_restaurant_id) || null;
-        if (!activeId) throw new Error('مفيش مطعم مختار النهارده');
-
-        const data = params.data || {};
-        if (!normAr(data.name || '')) throw new Error('الاسم مفيش');
-        if (data.items !== undefined && !Array.isArray(data.items)) {
-          // Without this the forEach inside cleanItems throws and the raw JS
-          // message ("...forEach is not a function") is shown to the user.
-          throw new Error('الطلب غير صالح');
-        }
-
-        const items = await cleanItemsForRestaurant(db, data.items, activeId);
-        if (!items.length) throw new Error('الطلب فاضي');
-
-        // Trim before storing: an untrimmed "  سارة  " would become a SECOND
-        // order row alongside "سارة", and the manager would see two of them.
-        const cleanName = String(data.name || '').trim();
-        const orderedBy = String(data.orderedBy || cleanName).trim();
-
-        // `paid` is deliberately absent from the SET list: a user editing their
-        // order after paying stays marked paid. Only setPaid writes it.
-        // RETURNING, not a follow-up SELECT: a separate SELECT can race against a
-        // concurrent cancelOrder and come back empty, and reading rows[0] would
-        // then leak a raw TypeError to the user.
-        // `paid` is deliberately NOT returned here - this is a public endpoint.
-        const { rows: saved } = await db.query(
-          `INSERT INTO orders (name, items, ordered_by)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (name) DO UPDATE
-             SET items      = EXCLUDED.items,
-                 ordered_by = EXCLUDED.ordered_by,
-                 updated_at = NOW()
-           RETURNING name, items, ordered_by`,
-          [cleanName, JSON.stringify(items), orderedBy]
-        );
-
-        // Record notes as suggestions for other users. Must NEVER fail the
-        // order: it is already saved and matters more than this.
-        try {
-          for (const it of items) {
-            if (!it.note) continue;
-            const noteNorm = normNote(it.note);
-            if (!noteNorm) continue;
-            await db.query(
-              `INSERT INTO note_suggestions (restaurant_id, item_name, note, note_norm)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (restaurant_id, item_name, note_norm) DO NOTHING`,
-              [activeId, it.name, it.note.trim(), noteNorm]
-            );
-          }
-        } catch (e) {
-          console.error('note_suggestions insert failed (order still saved):', e.message);
-        }
-
-        // Remember this as the person's last order for the "same as last time?"
-        // prompt. Survives reset. Best-effort: never fail the saved order.
-        try {
-          await db.query(
-            `INSERT INTO last_orders (name, items, updated_at)
-             VALUES ($1, $2, NOW())
-             ON CONFLICT (name) DO UPDATE SET items = EXCLUDED.items, updated_at = NOW()`,
-            [cleanName, JSON.stringify(items)]
-          );
-        } catch (e) {
-          console.error('last_orders upsert failed (order still saved):', e.message);
-        }
-
-        // Hand back what was actually stored. The client must adopt this rather
-        // than its own array: prices were re-read from the menu, off-menu items
-        // dropped, notes truncated at 200 chars and quantities capped at 99.
-        const row = saved[0];
-        broadcast();
-        return res.json({
-          success: true,
-          order: row
-            ? { name: row.name, items: row.items, orderedBy: row.ordered_by }
-            : null
-        });
-      }
-
-      case 'cancelOrder': {
-        // Post-lock integrity: once the order has gone to the restaurant, it
-        // must not be silently removed from the totals the manager collects on.
-        const cfg = await readConfig(['locked']);
-        if (cfg.locked === 'true') throw new Error('الطلبات مقفولة');
-        // RAW name - see middleware normAr comment.
-        await db.query('DELETE FROM orders WHERE name = $1', [String(params.name || '').trim()]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // MANAGER: NAMES
-      // ═══════════════════════════════════════════════════════════════════
-      case 'addName': {
-        checkMgr(params.ref);
-        const name = String(params.name || '').trim();
-        if (!name) throw new Error('الاسم مفيش');
-        // Bug 9.1 (interim guard): reject a name already on the roster after
-        // normalisation. Without this, ON CONFLICT DO NOTHING silently no-ops -
-        // the manager thinks the person was added, and because orders.name is
-        // the PK, two people sharing a name have their orders collide (the
-        // second silently overwrites the first). Force a distinguishing suffix
-        // (محمد ع / محمد س) at add time instead. normAr is used here only to
-        // COMPARE, never in a WHERE clause - see middleware §8.1.
-        const norm = normAr(name);
-        const { rows: existing } = await db.query('SELECT name FROM names');
-        if (existing.some(r => normAr(r.name) === norm)) {
-          throw new Error('الاسم ده موجود بالفعل — ميّزه (مثلا بإضافة أول حرف من اسم العيلة)');
-        }
-        await db.query('INSERT INTO names (name) VALUES ($1) ON CONFLICT DO NOTHING', [name]);
-        return res.json({ success: true });
-      }
-
-      case 'deleteName': {
-        checkMgr(params.ref);
-        await db.query('DELETE FROM names WHERE name = $1', [String(params.name || '').trim()]);
-        return res.json({ success: true });
-      }
-
-      // Manager-only. Returns saved InstaPay numbers so the collector picker
-      // can autofill. Kept separate from getNames so the public shape is safe.
-      case 'getNamesAdmin': {
-        checkMgr(params.ref);
-        const { rows } = await db.query(
-          "SELECT name, instapay_number FROM names ORDER BY name"
-        );
-        return res.json({ success: true, data: rows });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // MANAGER: RESTAURANT + PAYMENT + DELIVERY
-      // ═══════════════════════════════════════════════════════════════════
-      case 'setActiveRestaurant': {
-        checkMgr(params.ref);
-        const id = parseInt(params.id);
-        if (!id) throw new Error('اختار مطعم');
-
-        // Guard against a restaurant id that does not exist. Without this the
-        // day silently points at a ghost: empty menu, fee 0, and every order
-        // rejected with the misleading "الطلب فاضي".
-        const { rows: found } = await db.query('SELECT id FROM restaurants WHERE id = $1', [id]);
-        if (!found.length) throw new Error('المطعم مش موجود');
-
-        const cfg = await readConfig(['active_restaurant_id']);
-        const currentId = parseInt(cfg.active_restaurant_id) || null;
-
-        if (id === currentId) return res.json({ success: true }); // silent no-op
-
-        // Orders store a price snapshot. Switching restaurants would leave them
-        // referencing items and prices that no longer exist. Block, don't wipe.
-        const { rows } = await db.query('SELECT COUNT(*) FROM orders');
-        if (parseInt(rows[0].count, 10) > 0) {
-          throw new Error('في طلبات موجودة — اعمل تصفير الطلبات الأول');
-        }
-
-        await db.query("UPDATE config SET value = $1 WHERE key = 'active_restaurant_id'", [String(id)]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      case 'setPaymentInfo': {
-        checkMgr(params.ref);
-        const d = params.data || {};
-        const collectorName   = String(d.collectorName  || '').trim();
-        const instapayNumber  = String(d.instapayNumber || '').trim();
-        const paymentCash     = d.paymentCash     === true || d.paymentCash     === 'true';
-        const paymentInstapay = d.paymentInstapay === true || d.paymentInstapay === 'true';
-        const isKnownName     = d.isKnownName     === true || d.isKnownName     === 'true';
-
-        if (!collectorName)                     throw new Error('اختار المسؤول عن التحصيل');
-        if (!paymentCash && !paymentInstapay)   throw new Error('اختار طريقة دفع');
-        if (paymentInstapay && !instapayNumber) throw new Error('ادخل رقم الإنستاباي');
-
-        // Number is stored EXACTLY as typed. No format validation, no stripping.
-        await Promise.all([
-          db.query("UPDATE config SET value = $1 WHERE key = 'collector_name'",     [collectorName]),
-          db.query("UPDATE config SET value = $1 WHERE key = 'payment_cash'",       [paymentCash     ? 'true' : 'false']),
-          db.query("UPDATE config SET value = $1 WHERE key = 'payment_instapay'",   [paymentInstapay ? 'true' : 'false']),
-          db.query("UPDATE config SET value = $1 WHERE key = 'collector_instapay'", [instapayNumber])
-        ]);
-
-        // Remember a known person's number for next time. Ad-hoc collectors
-        // (isKnownName false) are NOT added to names and their number is NOT
-        // persisted anywhere except today's config.
-        if (isKnownName && paymentInstapay && instapayNumber) {
-          await db.query(
-            'UPDATE names SET instapay_number = $1 WHERE name = $2',
-            [instapayNumber, collectorName]
-          );
-        }
-        broadcast(); return res.json({ success: true });
-      }
-
-      case 'setDeliveryOverride': {
-        checkMgr(params.ref);
-        const raw = params.value;
-        if (raw === null || raw === undefined || String(raw).trim() === '') {
-          await db.query("UPDATE config SET value = '' WHERE key = 'delivery_fee_override'");
-          broadcast(); return res.json({ success: true });
-        }
-        const trimmed = String(raw).trim();
-        const n = parseInt(trimmed, 10);
-        if (!Number.isFinite(n) || n < 0 || String(n) !== trimmed) throw new Error('رقم غلط');
-        await db.query("UPDATE config SET value = $1 WHERE key = 'delivery_fee_override'", [String(n)]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // MANAGER: ORDER CONTROL
-      // ═══════════════════════════════════════════════════════════════════
-      case 'setOrderingStatus': {
-        checkMgr(params.ref);
-        const val = params.enabled === true || params.enabled === 'true' ? 'true' : 'false';
-        if (val === 'true') {
-          // Cannot open ordering until a money collector AND a restaurant are set.
-          const c = await readConfig(['collector_name', 'active_restaurant_id']);
-          if (!String(c.collector_name || '').trim()) {
-            throw new Error('اختار المسؤول عن تحصيل الفلوس الأول');
-          }
-          if (!parseInt(c.active_restaurant_id)) {
-            throw new Error('اختار مطعم اليوم الأول قبل ما تفتح الطلبات');
-          }
-        }
-        await db.query("UPDATE config SET value = $1 WHERE key = 'orderingOpen'", [val]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      case 'lock': {
-        checkMgr(params.ref);
-        const lockTime = new Date().toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Cairo' });
-        await Promise.all([
-          db.query("UPDATE config SET value = 'true' WHERE key = 'locked'"),
-          db.query("UPDATE config SET value = $1     WHERE key = 'lockTime'", [lockTime])
-        ]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      case 'unlock': {
-        checkMgr(params.ref);
-        // Reopen a locked day WITHOUT wiping orders: clears the hard lock and
-        // its timestamp only. orderingOpen is left as-is (it was 'true' when the
-        // day was locked, since lock is only reachable while ordering is open),
-        // so employees can add/edit again and every existing order is kept.
-        await Promise.all([
-          db.query("UPDATE config SET value = 'false' WHERE key = 'locked'"),
-          db.query("UPDATE config SET value = ''      WHERE key = 'lockTime'")
-        ]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      case 'reset': {
-        checkMgr(params.ref);
-        // Deletes all orders (and with them all `paid` status - payment
-        // tracking is per-day by design, there is no history table).
-        // Deliberately NOT cleared: active_restaurant_id (tomorrow is usually
-        // the same place), note_suggestions, names, menu, restaurants.
-        await performReset();
-        broadcast(); return res.json({ success: true });
-      }
-
-      case 'mgr_update': {
-        checkMgr(params.ref);
-        const data = params.data || {};
-
-        // Empty item list = delete the order. Must work even with no active
-        // restaurant, so this branch runs BEFORE the activeId check.
-        if (!Array.isArray(data.items) || data.items.length === 0) {
-          await db.query('DELETE FROM orders WHERE name = $1', [String(data.name || '').trim()]);
-          broadcast(); return res.json({ success: true });
-        }
-
-        const cfg      = await readConfig(['active_restaurant_id']);
-        const activeId = parseInt(cfg.active_restaurant_id) || null;
-        if (!activeId) throw new Error('مفيش مطعم مختار');
-
-        const items = await cleanItemsForRestaurant(db, data.items, activeId);
-        if (!items.length) {
-          // Everything filtered out as off-menu: treat as delete.
-          await db.query('DELETE FROM orders WHERE name = $1', [String(data.name || '').trim()]);
-          broadcast(); return res.json({ success: true });
-        }
-
-        // Touches neither ordered_by (a proxy order keeps its placer) nor paid.
-        const { rows: saved } = await db.query(
-          `INSERT INTO orders (name, items, ordered_by)
-           VALUES ($1, $2, $1)
-           ON CONFLICT (name) DO UPDATE
-             SET items = EXCLUDED.items, updated_at = NOW()
-           RETURNING name, items, ordered_by, paid`,
-          [String(data.name || '').trim(), JSON.stringify(items)]
-        );
-        // Feed the "same as last time?" prompt from manager edits too, so a
-        // manager-created order becomes a repeat option next time. Best-effort.
-        try {
-          await db.query(
-            `INSERT INTO last_orders (name, items, updated_at)
-             VALUES ($1, $2, NOW())
-             ON CONFLICT (name) DO UPDATE SET items = EXCLUDED.items, updated_at = NOW()`,
-            [String(data.name || '').trim(), JSON.stringify(items)]
-          );
-        } catch (e) { console.error('last_orders upsert (mgr) failed:', e.message); }
-        // Includes `paid` so the dashboard does not have to preserve it locally.
-        const row = saved[0];
-        broadcast();
-        return res.json({
-          success: true,
-          order: row
-            ? { name: row.name, items: row.items, orderedBy: row.ordered_by, paid: row.paid }
-            : null
-        });
-      }
-
-      case 'mgr_delete': {
-        checkMgr(params.ref);
-        await db.query('DELETE FROM orders WHERE name = $1', [String(params.name || '').trim()]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // MANAGER: PAYMENT TRACKING (PRIVATE)
-      // Who has paid must never appear in an unauthenticated response.
-      // ═══════════════════════════════════════════════════════════════════
-      case 'getOrdersAdmin': {
-        checkMgr(params.ref);
-        const { rows } = await db.query(
-          "SELECT name, items, ordered_by, paid FROM orders ORDER BY created_at"
-        );
-        return res.json({
-          success: true,
-          data: rows.map(r => ({
-            name: r.name, items: r.items, orderedBy: r.ordered_by, paid: r.paid
-          }))
-        });
-      }
-
-      case 'setPaid': {
-        checkMgr(params.ref);
-        const val = (params.paid === true || params.paid === 'true');
-        await db.query(
-          'UPDATE orders SET paid = $1 WHERE name = $2',
-          [val, String(params.name || '').trim()]
-        );
-        return res.json({ success: true });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // SUPER MANAGER: RESTAURANTS
-      // ═══════════════════════════════════════════════════════════════════
-      case 'addRestaurant': {
-        checkSuperMgr(params.ref);
-        const name = String(params.name || '').trim();
-        if (!name) throw new Error('اسم المطعم مفيش');
-        const dup = await db.query('SELECT 1 FROM restaurants WHERE name = $1', [name]);
-        if (dup.rows.length) throw new Error('المطعم ده موجود بالفعل');
-        const { rows } = await db.query(
-          `INSERT INTO restaurants (name, sort_order)
-           VALUES ($1, COALESCE((SELECT MAX(sort_order) + 1 FROM restaurants), 1))
-           RETURNING id, name, delivery_fee`,
-          [name]
-        );
-        return res.json({
-          success: true,
-          id: rows[0].id, name: rows[0].name, delivery_fee: rows[0].delivery_fee
-        });
-      }
-
-      case 'renameRestaurant': {
-        checkSuperMgr(params.ref);
-        const id   = parseInt(params.id);
-        const name = String(params.name || '').trim();
-        if (!id || !name) throw new Error('بيانات ناقصة');
-        const clash = await db.query('SELECT 1 FROM restaurants WHERE name = $1 AND id <> $2', [name, id]);
-        if (clash.rows.length) throw new Error('في مطعم تاني بنفس الاسم');
-        await db.query("UPDATE restaurants SET name = $1 WHERE id = $2", [name, id]);
-        return res.json({ success: true });
-      }
-
-      case 'deleteRestaurant': {
-        checkSuperMgr(params.ref);
-        const id = parseInt(params.id);
-        if (!id) throw new Error('id مفيش');
-        const cfg = await readConfig(['active_restaurant_id']);
-        if (String(id) === cfg.active_restaurant_id) {
-          throw new Error('المطعم ده شغال النهارده — غيّر المطعم الأول');
-        }
-        // Cascade: suggestions first (FK), then menu, then the restaurant.
-        await db.query("DELETE FROM note_suggestions WHERE restaurant_id = $1", [id]);
-        await db.query("DELETE FROM menu             WHERE restaurant_id = $1", [id]);
-        await db.query("DELETE FROM restaurants      WHERE id = $1",            [id]);
-        return res.json({ success: true });
-      }
-
-      case 'setRestaurantFee': {
-        checkSuperMgr(params.ref);
-        const id  = parseInt(params.id);
-        const fee = parseInt(params.fee, 10);
-        if (!id) throw new Error('id مفيش');
-        if (!Number.isFinite(fee) || fee < 0) throw new Error('رقم غلط');
-        // Does NOT clear a daily override - the override always wins for today.
-        await db.query('UPDATE restaurants SET delivery_fee = $1 WHERE id = $2', [fee, id]);
-        return res.json({ success: true });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // SUPER MANAGER: MENU
-      // ═══════════════════════════════════════════════════════════════════
-      case 'getMenuAdmin': {
-        checkSuperMgr(params.ref);
-        const [restRes, itemRes, noteRes] = await Promise.all([
-          db.query("SELECT id, name, delivery_fee FROM restaurants ORDER BY sort_order, id"),
-          db.query("SELECT id, restaurant_id, category, name, price, sort_order FROM menu ORDER BY restaurant_id, category, sort_order, id"),
-          db.query("SELECT id, restaurant_id, item_name, note FROM note_suggestions ORDER BY restaurant_id, item_name, id")
-        ]);
-        const data = restRes.rows.map(r => ({
-          id:           r.id,
-          name:         r.name,
-          delivery_fee: r.delivery_fee,
-          items:        itemRes.rows.filter(i => i.restaurant_id === r.id),
-          noteSuggestions: noteRes.rows
-            .filter(n => n.restaurant_id === r.id)
-            .map(n => ({ id: n.id, item_name: n.item_name, note: n.note }))
-        }));
-        return res.json({ success: true, data });
-      }
-
-      case 'addMenuItem': {
-        checkSuperMgr(params.ref);
-        const restaurantId = parseInt(params.restaurantId);
-        const category     = String(params.category || '').trim();
-        const name         = String(params.name     || '').trim();
-        const price        = parseInt(params.price);
-        if (!restaurantId || !category || !name || !(price > 0)) throw new Error('بيانات ناقصة');
-        // Prevent duplicate item names in the same restaurant+category. Without this,
-        // two items with the same name produce ambiguous priceMap entries in
-        // cleanItemsForRestaurant() and duplicate rows in the user's order screen.
-        const dup = await db.query(
-          'SELECT 1 FROM menu WHERE restaurant_id = $1 AND category = $2 AND name = $3',
-          [restaurantId, category, name]
-        );
-        if (dup.rows.length) throw new Error('صنف بنفس الاسم موجود بالفعل في هذه الفئة');
-
-        const { rows } = await db.query(
-          `INSERT INTO menu (restaurant_id, category, name, price, sort_order)
-           VALUES ($1, $2, $3, $4,
-             COALESCE((SELECT MAX(sort_order) + 1 FROM menu WHERE restaurant_id = $1 AND category = $2), 1))
-           RETURNING id`,
-          [restaurantId, category, name, price]
-        );
-        return res.json({ success: true, id: rows[0].id });
-      }
-
-      case 'editMenuItem': {
-        checkSuperMgr(params.ref);
-        const id       = parseInt(params.id);
-        const name     = String(params.name     || '').trim();
-        const price    = parseInt(params.price);
-        const category = String(params.category || '').trim();
-        if (!id || !name || !(price > 0) || !category) throw new Error('بيانات ناقصة');
-
-        const { rows: oldRows } = await db.query(
-          'SELECT restaurant_id, name, category FROM menu WHERE id = $1', [id]
-        );
-        if (!oldRows.length) throw new Error('الصنف مش موجود');
-        const oldName     = oldRows[0].name;
-        const oldCategory = oldRows[0].category;
-        const restId      = oldRows[0].restaurant_id;
-
-        // Bug 9.2: a rename or a move to another category strands live orders.
-        // A price-only edit does not (orders are snapshots), so allow that.
-        if ((name !== oldName || category !== oldCategory) &&
-            await activeRestaurantHasOrders(restId)) {
-          throw new Error(MENU_LOCKED_MSG);
-        }
-
-        // Prevent a rename from colliding with an existing item in the target
-        // category. A collision would create duplicate priceMap entries in
-        // cleanItemsForRestaurant() with unpredictable price assignment.
-        if (name !== oldName || category !== oldCategory) {
-          const dupCheck = await db.query(
-            'SELECT 1 FROM menu WHERE restaurant_id = $1 AND category = $2 AND name = $3 AND id <> $4',
-            [restId, category, name, id]
-          );
-          if (dupCheck.rows.length) throw new Error('صنف بنفس الاسم موجود بالفعل في هذه الفئة');
-        }
-
-        await db.query(
-          "UPDATE menu SET name = $1, price = $2, category = $3 WHERE id = $4",
-          [name, price, category, id]
-        );
-
-        // Carry note suggestions across the rename so they don't orphan.
-        if (restId && oldName !== name) {
-          // The unique index would reject the UPDATE if the target name already
-          // holds an identical note, so clear colliding rows first.
-          await db.query(
-            `DELETE FROM note_suggestions
-             WHERE restaurant_id = $1 AND item_name = $2
-               AND note_norm IN (
-                 SELECT note_norm FROM note_suggestions
-                 WHERE restaurant_id = $1 AND item_name = $3
-               )`,
-            [restId, name, oldName]
-          );
-          await db.query(
-            'UPDATE note_suggestions SET item_name = $1 WHERE restaurant_id = $2 AND item_name = $3',
-            [name, restId, oldName]
-          );
-        }
-        return res.json({ success: true });
-      }
-
-      case 'deleteMenuItem': {
-        checkSuperMgr(params.ref);
-        const id = parseInt(params.id);
-        if (!id) throw new Error('id مفيش');
-        const { rows } = await db.query('SELECT restaurant_id, name FROM menu WHERE id = $1', [id]);
-        if (rows.length) {
-          // Bug 9.2: deleting an item out from under a live order strands it.
-          if (await activeRestaurantHasOrders(rows[0].restaurant_id)) {
-            throw new Error(MENU_LOCKED_MSG);
-          }
-          await db.query(
-            'DELETE FROM note_suggestions WHERE restaurant_id = $1 AND item_name = $2',
-            [rows[0].restaurant_id, rows[0].name]
-          );
-        }
-        await db.query("DELETE FROM menu WHERE id = $1", [id]);
-        return res.json({ success: true });
-      }
-
-      case 'renameCategory': {
-        checkSuperMgr(params.ref);
-        const restaurantId = parseInt(params.restaurantId);
-        const oldName      = String(params.oldName || '').trim();
-        const newName      = String(params.newName || '').trim();
-        if (!restaurantId || !oldName || !newName) throw new Error('بيانات ناقصة');
-        // Bug 9.2: a category rename changes the category of live items.
-        if (await activeRestaurantHasOrders(restaurantId)) throw new Error(MENU_LOCKED_MSG);
-        // Prevent silently merging two categories: if newName already exists
-        // as a category in this restaurant, the UPDATE would move all oldName
-        // items there, destroying the separation with no way to undo.
-        if (oldName !== newName) {
-          const clash = await db.query(
-            'SELECT 1 FROM menu WHERE restaurant_id = $1 AND category = $2 LIMIT 1',
-            [restaurantId, newName]
-          );
-          if (clash.rows.length) throw new Error('في فئة تانية بنفس الاسم — اختار اسم تاني');
-        }
-        // No note_suggestions cascade needed: suggestions key on item name.
-        await db.query(
-          "UPDATE menu SET category = $1 WHERE restaurant_id = $2 AND category = $3",
-          [newName, restaurantId, oldName]
-        );
-        return res.json({ success: true });
-      }
-
-      case 'deleteCategory': {
-        checkSuperMgr(params.ref);
-        const restaurantId = parseInt(params.restaurantId);
-        const category     = String(params.category || '').trim();
-        if (!restaurantId || !category) throw new Error('بيانات ناقصة');
-        // Bug 9.2: deleting a category deletes live items out from under orders.
-        if (await activeRestaurantHasOrders(restaurantId)) throw new Error(MENU_LOCKED_MSG);
-        // Suggestions first, while the menu rows still exist to name them.
-        await db.query(
-          `DELETE FROM note_suggestions
-           WHERE restaurant_id = $1
-             AND item_name IN (SELECT name FROM menu WHERE restaurant_id = $1 AND category = $2)`,
-          [restaurantId, category]
-        );
-        await db.query(
-          "DELETE FROM menu WHERE restaurant_id = $1 AND category = $2",
-          [restaurantId, category]
-        );
-        return res.json({ success: true });
-      }
-
-      case 'deleteNoteSuggestion': {
-        checkSuperMgr(params.ref);
-        const id = parseInt(params.id);
-        if (!id) throw new Error('id مفيش');
-        // Never touches existing orders: those are snapshots and keep their
-        // note text exactly as the user typed it.
-        await db.query('DELETE FROM note_suggestions WHERE id = $1', [id]);
-        return res.json({ success: true });
-      }
-
-      case 'saveSchedule': {
-        checkMgr(params.ref);
-        const d = params.data || {};
-        const H = v => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 && n <= 23 ? n : null; };
-        const M = v => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 && n <= 59 ? n : null; };
-        const rh = H(d.resetHour), rm = M(d.resetMinute);
-        if (rh === null || rm === null) throw new Error('وقت التصفير غير صالح');
-        const autoOpen  = d.autoOpenEnabled === true || d.autoOpenEnabled === 'true';
-        const oh = H(d.openHour), om = M(d.openMinute);
-        const collector = String(d.openCollectorName || '').trim();
-        const cash      = d.openPayCash     === true || d.openPayCash     === 'true';
-        const instapay  = d.openPayInstapay === true || d.openPayInstapay === 'true';
-        const inum      = String(d.openInstapayNumber || '').trim();
-        if (autoOpen) {
-          if (oh === null || om === null)       throw new Error('وقت الفتح غير صالح');
-          if (!collector)                       throw new Error('اختار المسؤول عن التحصيل للفتح التلقائي');
-          if (!cash && !instapay)               throw new Error('اختار طريقة دفع للفتح التلقائي');
-          if (instapay && !inum)                throw new Error('ادخل رقم الإنستاباي للفتح التلقائي');
-        }
-        const ohh = oh === null ? 6 : oh, omm = om === null ? 0 : om;
-        // Re-mark both periods to "now" so changing a time never fires an
-        // instant reset/open; the next boundary is the next real trigger.
-        await Promise.all([
-          upsertCfg('reset_hour',           String(rh)),
-          upsertCfg('reset_minute',         String(rm)),
-          upsertCfg('last_reset_period',    String(cairoPeriodIndex(rh, rm))),
-          upsertCfg('auto_open_enabled',    autoOpen ? 'true' : 'false'),
-          upsertCfg('open_hour',            String(ohh)),
-          upsertCfg('open_minute',          String(omm)),
-          upsertCfg('open_collector_name',  collector),
-          upsertCfg('open_pay_cash',        cash ? 'true' : 'false'),
-          upsertCfg('open_pay_instapay',    instapay ? 'true' : 'false'),
-          upsertCfg('open_instapay_number', inum),
-          upsertCfg('last_open_period',     String(cairoPeriodIndex(ohh, omm)))
-        ]);
-        broadcast(); return res.json({ success: true });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // WEB PUSH
-      // ═══════════════════════════════════════════════════════════════════════
-      case 'getVapidKey': {
-        return res.json({ success: true, key: webpush ? VAPID_PUBLIC : '' });
-      }
-
-      case 'savePushSubscription': {
-        const sub  = params.subscription;
-        const name = String(params.name || '').trim();
-        if (!sub || !sub.endpoint) throw new Error('اشتراك غير صالح');
-        await db.query(
-          `INSERT INTO push_subscriptions (endpoint, name, sub) VALUES ($1, $2, $3)
-           ON CONFLICT (endpoint) DO UPDATE SET name = $2, sub = $3`,
-          [sub.endpoint, name, JSON.stringify(sub)]
-        );
-        return res.json({ success: true });
-      }
-
-      case 'deletePushSubscription': {
-        const endpoint = String(params.endpoint || '');
-        if (endpoint) await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
-        return res.json({ success: true });
-      }
-
-      case 'notifyOrderingOpen': {
-        checkMgr(params.ref);
-        if (!webpush) throw new Error('الإشعارات مش مفعّلة على السيرفر');
-        // Notify EVERY registered subscriber — ordering just opened and we want
-        // all employees to know, not just those who already have an order.
-        const allSubs = await db.query('SELECT endpoint, sub FROM push_subscriptions');
-        const openPayload = JSON.stringify({
-          title: '🥙 الطلبات اتفتحت!',
-          body:  String(params.message || 'اطلب فطارك دلوقتي قبل ما يتقفل الطلب'),
-          tag:   'fitar-open'
-        });
-        let sent = 0, removed = 0;
-        await Promise.all(allSubs.rows.map(async row => {
-          const sb = typeof row.sub === 'string' ? JSON.parse(row.sub) : row.sub;
-          try {
-            await webpush.sendNotification(sb, openPayload, { urgency: 'high', TTL: 7200 });
-            sent++;
-          } catch (err) {
-            if (err.statusCode === 404 || err.statusCode === 410) {
-              await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [row.endpoint]);
-              removed++;
-            }
-          }
-        }));
-        return res.json({ success: true, sent, removed });
-      }
-
-      case 'notifyArrived': {
-        checkMgr(params.ref);
-        if (!webpush) throw new Error('الإشعارات مش مفعّلة على السيرفر');
-        // Only notify people who have an order today (as the orderer or the
-        // person it was ordered for).
-        const subs = await db.query(`
-          SELECT endpoint, sub FROM push_subscriptions
-          WHERE name IN (
-            SELECT name FROM orders
-            UNION
-            SELECT ordered_by FROM orders WHERE ordered_by <> ''
-          )
-        `);
-        const payload = JSON.stringify({
-          title: '🍽️ الأكل وصل!',
-          body:  String(params.message || 'روح استلم طلبك 😋'),
-          tag:   'fitar-arrived'
-        });
-        let sent = 0, removed = 0;
-        await Promise.all(subs.rows.map(async row => {
-          const sb = typeof row.sub === 'string' ? JSON.parse(row.sub) : row.sub;
-          try {
-            await webpush.sendNotification(sb, payload, { urgency: 'high', TTL: 3600 });
-            sent++;
-          } catch (err) {
-            // 404/410 = the subscription is dead; drop it so it doesn't pile up.
-            if (err.statusCode === 404 || err.statusCode === 410) {
-              await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [row.endpoint]);
-              removed++;
-            }
-          }
-        }));
-        return res.json({ success: true, sent, removed });
-      }
-
-      default:
-        return res.json({ success: false, error: 'إجراء غير معروف: ' + action });
-    }
-  } catch (err) {
-    return res.json({ success: false, error: err.message });
-  }
-});
-
-migrate()
-  .then(() => app.listen(PORT, () => console.log(`fitar backend running on port ${PORT}`)))
-  .catch(err => { console.error('Migration failed:', err.message); process.exit(1); });
+</script>
+</body>
+</html>
