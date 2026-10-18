@@ -471,10 +471,10 @@ document.addEventListener('click', e => {
     case 'doToggleOrdering': doToggleOrdering(); break;
     case 'mgrAddName':       mgrAddNewName();    break;
     case 'doSetRestaurant':    doSetRestaurant();    break;
-    case 'doSavePayment':      doSavePayment();      break;
+    case 'doSmSavePayment':    doSmSavePayment();    break;
     case 'doSaveFeeOverride':  doSaveFeeOverride();  break;
     case 'doClearFeeOverride': doClearFeeOverride(); break;
-    case 'doSaveSchedule':     doSaveSchedule();     break;
+    case 'doSmSaveSchedule':   doSmSaveSchedule();   break;
     case 'togglePaid': {
       const name = el.dataset.name;
       if (name) doTogglePaid(name, el.dataset.paid === '1', el);
