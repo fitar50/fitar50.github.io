@@ -222,12 +222,8 @@
   </div>
 
   <!-- Restaurant + payment config (rendered by manager.js _renderMgrConfig) -->
-  <div class="section-title">مطعم اليوم وإعدادات الدفع</div>
+  <div class="section-title">مطعم اليوم ورسوم التوصيل</div>
   <div id="mgrConfigSection"></div>
-
-  <!-- Auto reset / auto open schedule (rendered by manager.js _renderMgrSchedule) -->
-  <div class="section-title">المواعيد التلقائية</div>
-  <div id="mgrScheduleSection"></div>
 
   <div class="refresh-row">
     <span class="last-updated" id="lastUpdated"></span>
@@ -293,6 +289,11 @@
   </div>
   <!-- Content rendered dynamically by renderSuperMgrDashboard() -->
   <div id="superMgrContent" style="padding-bottom:40px;"></div>
+  <!-- Collector/payment and schedule sections rendered by supermanager.js -->
+  <div class="section-title" id="smCollectorTitle" style="display:none;">المسؤول عن التحصيل وطريقة الدفع</div>
+  <div id="smCollectorSection"></div>
+  <div class="section-title" id="smScheduleTitle" style="display:none;">المواعيد التلقائية</div>
+  <div id="smScheduleSection"></div>
 </div>
 
 <!-- ======================== EDIT MODAL ======================== -->
