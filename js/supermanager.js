@@ -64,12 +64,19 @@ function exitSuperMgr() {
 
 /* ---------- DATA ---------- */
 async function loadSuperMgrData() {
-  const r = await api('getMenuAdmin', { ref: S.superKey });
-  S.superData = (r.data || []).map(rest => ({
+  const [menuR, statusR, namesAdminR] = await Promise.all([
+    api('getMenuAdmin',  { ref: S.superKey }),
+    api('getStatus'),
+    api('getNamesAdmin', { ref: S.superKey })
+  ]);
+  S.superData = (menuR.data || []).map(rest => ({
     ...rest,
     _pendingCats: (S.superData.find(d => d.id === rest.id) || {})._pendingCats || []
   }));
-  S.restaurants = S.superData.map(r => ({ id: r.id, name: r.name, delivery_fee: r.delivery_fee }));
+  S.restaurants  = S.superData.map(r => ({ id: r.id, name: r.name, delivery_fee: r.delivery_fee }));
+  S.schedule     = statusR.schedule     || S.schedule     || {};
+  S.paymentInfo  = statusR.paymentInfo  || S.paymentInfo  || {};
+  S.namesAdmin   = namesAdminR.data     || S.namesAdmin   || [];
 }
 
 /* ---------- DASHBOARD ---------- */
@@ -216,6 +223,14 @@ function renderSuperMgrDashboard() {
     <div class="sm-section">
       ${menuHtml}
     </div>`;
+
+  // Show the collector + schedule sections (hidden until super manager logs in)
+  ['smCollectorTitle', 'smScheduleTitle'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = '';
+  });
+  _renderSmCollector();
+  _renderSmSchedule();
 }
 
 /* ---------- RESTAURANTS ---------- */
@@ -473,4 +488,262 @@ async function smDeleteNote(id) {
       renderSuperMgrDashboard();
     } catch (e) { showToast(e.message || 'فشل ❌'); }
   });
+}
+
+// ================================================================
+// COLLECTOR / PAYMENT — super manager only
+// ================================================================
+
+// Autofills the saved InstaPay number when a known collector is picked.
+function onCollectorChange() {
+  const sel  = document.getElementById('collectorSel');
+  const wrap = document.getElementById('collectorOtherWrap');
+  if (!sel) return;
+  const isOther = sel.value === '__other__';
+  if (wrap) wrap.style.display = isOther ? '' : 'none';
+
+  if (!isOther && sel.value) {
+    const rec = (S.namesAdmin || []).find(n => n.name === sel.value);
+    const inp = document.getElementById('instapayNumInp');
+    if (rec && inp) inp.value = rec.instapay_number || '';
+  }
+}
+
+function _renderSmCollector() {
+  const section = document.getElementById('smCollectorSection');
+  if (!section) return;
+
+  // Skip rebuild if user is mid-edit
+  const ae = document.activeElement;
+  if (ae && ae !== document.body && section.contains(ae) &&
+      /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
+
+  const pi         = S.paymentInfo || {};
+  const knownNames = (S.namesAdmin || []).map(n => n.name);
+  const isOther    = pi.collectorName && !knownNames.includes(pi.collectorName);
+
+  const curCollector = document.getElementById('collectorSel')?.value
+    ?? (pi.collectorName && knownNames.includes(pi.collectorName) ? pi.collectorName
+        : (pi.collectorName ? '__other__' : ''));
+  const curOtherName = document.getElementById('collectorOtherName')?.value
+    ?? (isOther ? pi.collectorName : '');
+  const curCash     = document.getElementById('payCash')?.checked     ?? !!pi.paymentCash;
+  const curInstapay = document.getElementById('payInstapay')?.checked ?? !!pi.paymentInstapay;
+  const curNumber   = document.getElementById('instapayNumInp')?.value ?? (pi.instapayNumber || '');
+
+  const collectorOptions = knownNames
+    .map(n => `<option value="${h(n)}" ${curCollector === n ? 'selected' : ''}>${h(n)}</option>`)
+    .join('');
+
+  section.innerHTML = `
+    <div class="mgr-config-card" style="margin:0 14px 0;">
+      <div class="cfg-row">
+        <span class="cfg-label">المسؤول عن تحصيل الفلوس</span>
+        <div class="sel-wrap">
+          <select id="collectorSel">
+            <option value="">-- اختار --</option>
+            ${collectorOptions}
+            <option value="__other__" ${curCollector === '__other__' ? 'selected' : ''}>➕ شخص آخر</option>
+          </select>
+        </div>
+        <div id="collectorOtherWrap" style="${curCollector === '__other__' ? '' : 'display:none;'}margin-top:8px;">
+          <input id="collectorOtherName" type="text" class="cfg-text-input"
+            placeholder="اسم المسؤول" maxlength="30" value="${h(curOtherName)}">
+        </div>
+      </div>
+
+      <div class="cfg-row">
+        <span class="cfg-label">طريقة الدفع</span>
+        <div class="cfg-check-row">
+          <label class="cfg-check-label"><input type="checkbox" id="payCash" ${curCash ? 'checked' : ''}> كاش</label>
+          <label class="cfg-check-label"><input type="checkbox" id="payInstapay" ${curInstapay ? 'checked' : ''}> إنستاباي</label>
+        </div>
+      </div>
+
+      <div class="cfg-row" id="instapayRow" ${curInstapay ? '' : 'style="display:none"'}>
+        <span class="cfg-label">لينك الإنستاباي</span>
+        <input id="instapayNumInp" type="url" placeholder="https://ipn.eg/S/..." maxlength="120"
+          class="cfg-text-input" style="direction:ltr;text-align:left;font-size:13px;" value="${h(curNumber)}">
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:4px;" data-action="doSmSavePayment">
+        💾 حفظ إعدادات الدفع
+      </button>
+      <div class="cfg-hint" style="text-align:center;">المدير بيشوف بس مين المسؤول وبيتابع مين دفع — مش بيقدر يغير</div>
+    </div>`;
+}
+
+async function doSmSavePayment() {
+  const sel         = document.getElementById('collectorSel');
+  const selVal      = sel ? sel.value : '';
+  const isOther     = selVal === '__other__';
+  const collectorName = isOther
+    ? (document.getElementById('collectorOtherName')?.value.trim() || '')
+    : selVal;
+  const paymentCash     = document.getElementById('payCash')?.checked     || false;
+  const paymentInstapay = document.getElementById('payInstapay')?.checked || false;
+  const instapayNumber  = document.getElementById('instapayNumInp')?.value.trim() || '';
+
+  if (!selVal)                            { showToast('اختار المسؤول عن التحصيل'); return; }
+  if (isOther && !collectorName)          { showToast('اكتب اسم المسؤول');         return; }
+  if (!paymentCash && !paymentInstapay)   { showToast('اختار طريقة دفع');           return; }
+  if (paymentInstapay && !instapayNumber) { showToast('ادخل رقم الإنستاباي');       return; }
+
+  const btn = document.querySelector('[data-action="doSmSavePayment"]');
+  if (btn) setBtnLoading(btn, 'جاري الحفظ');
+  try {
+    await api('setPaymentInfo', {
+      data: { collectorName, isKnownName: !isOther, paymentCash, paymentInstapay, instapayNumber },
+      ref:  S.superKey
+    });
+    S.paymentInfo = { collectorName, paymentCash, paymentInstapay, instapayNumber };
+    if (!isOther) {
+      const rec = (S.namesAdmin || []).find(n => n.name === collectorName);
+      if (rec && paymentInstapay) rec.instapay_number = instapayNumber;
+    }
+    showToast('تم حفظ إعدادات الدفع ✓');
+  } catch (e) {
+    showToast(e.message || 'فشل حفظ إعدادات الدفع ❌');
+  } finally {
+    const b = document.querySelector('[data-action="doSmSavePayment"]');
+    if (b) resetBtn(b);
+  }
+}
+
+// ================================================================
+// SCHEDULE — super manager only
+// ================================================================
+
+function _renderSmSchedule() {
+  const section = document.getElementById('smScheduleSection');
+  if (!section) return;
+
+  const ae = document.activeElement;
+  if (ae && ae !== document.body && section.contains(ae) &&
+      /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
+
+  const sc       = S.schedule || {};
+  const resetH   = sc.resetHour    !== undefined ? sc.resetHour    : 20;
+  const resetM   = sc.resetMinute  !== undefined ? sc.resetMinute  : 0;
+  const autoOn   = !!sc.autoOpenEnabled;
+  const openH    = sc.openHour     !== undefined ? sc.openHour     : 6;
+  const openM    = sc.openMinute   !== undefined ? sc.openMinute   : 0;
+  const oCol     = sc.openCollectorName  || '';
+  const oCash    = !!sc.openPayCash;
+  const oInst    = !!sc.openPayInstapay;
+  const oInstNum = sc.openInstapayNumber || '';
+
+  const pad2 = n => String(n).padStart(2, '0');
+  const resetVal = `${pad2(resetH)}:${pad2(resetM)}`;
+  const openVal  = `${pad2(openH)}:${pad2(openM)}`;
+
+  const knownNames = (S.namesAdmin || []).map(n => n.name);
+  const colOptions = knownNames
+    .map(n => `<option value="${h(n)}" ${oCol === n ? 'selected' : ''}>${h(n)}</option>`)
+    .join('');
+
+  section.innerHTML = `
+    <div class="mgr-config-card" style="margin:0 14px 14px;">
+      <div class="cfg-row">
+        <span class="cfg-label">وقت التصفير التلقائي</span>
+        <input id="resetTime" type="time" class="cfg-text-input" value="${resetVal}">
+        <div class="cfg-hint">بيتمسح الطلبات ويقفل الأوردرز كل يوم في الوقت ده</div>
+      </div>
+
+      <div class="cfg-row">
+        <span class="cfg-label">الفتح التلقائي</span>
+        <label class="cfg-check-label">
+          <input type="checkbox" id="autoOpenChk" ${autoOn ? 'checked' : ''}> تفعيل الفتح التلقائي
+        </label>
+      </div>
+
+      <div id="autoOpenBox" style="${autoOn ? '' : 'display:none;'}">
+        <div class="cfg-row">
+          <span class="cfg-label">وقت الفتح</span>
+          <input id="openTime" type="time" class="cfg-text-input" value="${openVal}">
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">المسؤول عن التحصيل (فتح تلقائي)</span>
+          <div class="sel-wrap">
+            <select id="openCollectorSel">
+              <option value="">-- اختار --</option>
+              ${colOptions}
+            </select>
+          </div>
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">طريقة الدفع (فتح تلقائي)</span>
+          <div class="cfg-check-row">
+            <label class="cfg-check-label"><input type="checkbox" id="openCash" ${oCash ? 'checked' : ''}> كاش</label>
+            <label class="cfg-check-label"><input type="checkbox" id="openInstapay" ${oInst ? 'checked' : ''}> إنستاباي</label>
+          </div>
+        </div>
+        <div class="cfg-row" id="openInstapayRow" ${oInst ? '' : 'style="display:none"'}>
+          <span class="cfg-label">لينك الإنستاباي (فتح تلقائي)</span>
+          <input id="openInstapayNumInp" type="url" placeholder="https://ipn.eg/S/..." maxlength="120"
+            class="cfg-text-input" style="direction:ltr;text-align:left;font-size:13px;" value="${h(oInstNum)}">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:8px;" data-action="doSmSaveSchedule">
+        💾 حفظ المواعيد التلقائية
+      </button>
+    </div>`;
+}
+
+async function doSmSaveSchedule() {
+  const resetRaw = (document.getElementById('resetTime')?.value || '').split(':');
+  const resetH   = parseInt(resetRaw[0], 10);
+  const resetM   = parseInt(resetRaw[1], 10);
+  if (!Number.isFinite(resetH) || !Number.isFinite(resetM)) { showToast('وقت التصفير غلط'); return; }
+
+  const autoOpen = document.getElementById('autoOpenChk')?.checked || false;
+
+  let openH = 6, openM = 0, collector = '', cash = false, instapay = false, instapayNum = '';
+  if (autoOpen) {
+    const openRaw = (document.getElementById('openTime')?.value || '').split(':');
+    openH = parseInt(openRaw[0], 10);
+    openM = parseInt(openRaw[1], 10);
+    if (!Number.isFinite(openH) || !Number.isFinite(openM)) { showToast('وقت الفتح غلط'); return; }
+    collector   = document.getElementById('openCollectorSel')?.value || '';
+    cash        = document.getElementById('openCash')?.checked        || false;
+    instapay    = document.getElementById('openInstapay')?.checked    || false;
+    instapayNum = document.getElementById('openInstapayNumInp')?.value.trim() || '';
+
+    if (!collector)               { showToast('اختار المسؤول عن التحصيل للفتح التلقائي'); return; }
+    if (!cash && !instapay)       { showToast('اختار طريقة دفع للفتح التلقائي');          return; }
+    if (instapay && !instapayNum) { showToast('ادخل رقم الإنستاباي للفتح التلقائي');      return; }
+  }
+
+  const btn = document.querySelector('[data-action="doSmSaveSchedule"]');
+  if (btn) setBtnLoading(btn, 'جاري الحفظ');
+  try {
+    await api('saveSchedule', {
+      data: {
+        resetHour:          resetH,
+        resetMinute:        resetM,
+        autoOpenEnabled:    autoOpen,
+        openHour:           openH,
+        openMinute:         openM,
+        openCollectorName:  collector,
+        openPayCash:        cash,
+        openPayInstapay:    instapay,
+        openInstapayNumber: instapayNum
+      },
+      ref: S.superKey
+    });
+    S.schedule = {
+      resetHour: resetH, resetMinute: resetM,
+      autoOpenEnabled: autoOpen,
+      openHour: openH,   openMinute: openM,
+      openCollectorName: collector,
+      openPayCash: cash, openPayInstapay: instapay, openInstapayNumber: instapayNum
+    };
+    showToast('تم حفظ المواعيد ✓');
+  } catch (e) {
+    showToast(e.message || 'فشل الحفظ ❌');
+  } finally {
+    const b = document.querySelector('[data-action="doSmSaveSchedule"]');
+    if (b) resetBtn(b);
+  }
 }
