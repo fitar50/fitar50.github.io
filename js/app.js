@@ -472,6 +472,7 @@ document.addEventListener('click', e => {
     case 'mgrAddName':       mgrAddNewName();    break;
     case 'doSetRestaurant':    doSetRestaurant();    break;
     case 'doSmSavePayment':    doSmSavePayment();    break;
+    case 'doMgrSavePayment':   doMgrSavePayment();   break;
     case 'doSaveFeeOverride':  doSaveFeeOverride();  break;
     case 'doClearFeeOverride': doClearFeeOverride(); break;
     case 'doSmSaveSchedule':   doSmSaveSchedule();   break;
