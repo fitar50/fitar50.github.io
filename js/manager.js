@@ -582,8 +582,7 @@ function _renderMgrActions() {
     : '';
 
   const toggleHtml = S.orderingOpen
-    ? `<div class="ordering-open-badge">🟢 الطلبات مفتوحة للموظفين</div>
-       <button class="btn btn-outline" style="color:#e65100;border-color:#e65100;background:#fff3e0;" data-action="doToggleOrdering">🔴 إغلاق الطلبات مؤقتاً</button>`
+    ? `<div class="ordering-open-badge">🟢 الطلبات مفتوحة للموظفين</div>`
     : `<div class="ordering-closed-badge">🔴 الطلبات مش مفتوحة لسه</div>
        <button class="btn btn-green" data-action="doToggleOrdering">🟢 فتح الطلبات للموظفين</button>`;
   const lockHtml = S.orderingOpen
