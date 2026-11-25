@@ -224,12 +224,9 @@ function renderSuperMgrDashboard() {
       ${menuHtml}
     </div>`;
 
-  // Show the collector + schedule sections (hidden until super manager logs in)
-  ['smCollectorTitle', 'smScheduleTitle'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = '';
-  });
-  _renderSmCollector();
+  // Show the schedule section (hidden until super manager logs in)
+  const smSchedTitle = document.getElementById('smScheduleTitle');
+  if (smSchedTitle) smSchedTitle.style.display = '';
   _renderSmSchedule();
 }
 
