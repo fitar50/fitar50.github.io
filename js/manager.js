@@ -165,6 +165,7 @@ function renderManagerDashboard() {
 
   fillNameDropdown('mgrPersonSel', true);
   renderNamesManagement();
+  _renderMgrCollector();
   _renderMgrActions();
 }
 
@@ -293,6 +294,125 @@ async function doClearFeeOverride() {
     showToast('رجعنا لرسوم المطعم ✓');
     renderManagerDashboard();
   } catch (e) { showToast(e.message || 'فشل الإلغاء ❌'); }
+}
+
+// ── Collector / payment setup (MANAGER) ───────────────────────────────────
+// The manager sets who collects the money and how, before opening ordering.
+
+function onMgrCollectorChange() {
+  const sel  = document.getElementById('mgrCollectorSel');
+  const wrap = document.getElementById('mgrCollectorOtherWrap');
+  if (!sel) return;
+  const isOther = sel.value === '__other__';
+  if (wrap) wrap.style.display = isOther ? '' : 'none';
+
+  if (!isOther && sel.value) {
+    const rec = (S.namesAdmin || []).find(n => n.name === sel.value);
+    const inp = document.getElementById('mgrInstapayNumInp');
+    if (rec && inp) inp.value = rec.instapay_number || '';
+  }
+}
+
+function _renderMgrCollector() {
+  const section = document.getElementById('mgrCollectorSection');
+  if (!section) return;
+
+  // Skip rebuild while user is mid-edit
+  const ae = document.activeElement;
+  if (ae && ae !== document.body && section.contains(ae) &&
+      /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
+
+  const pi         = S.paymentInfo || {};
+  const knownNames = (S.namesAdmin || []).map(n => n.name);
+  const isOther    = pi.collectorName && !knownNames.includes(pi.collectorName);
+
+  const curCollector = document.getElementById('mgrCollectorSel')?.value
+    ?? (pi.collectorName && knownNames.includes(pi.collectorName) ? pi.collectorName
+        : (pi.collectorName ? '__other__' : ''));
+  const curOtherName = document.getElementById('mgrCollectorOtherName')?.value
+    ?? (isOther ? pi.collectorName : '');
+  const curCash     = document.getElementById('mgrPayCash')?.checked     ?? !!pi.paymentCash;
+  const curInstapay = document.getElementById('mgrPayInstapay')?.checked ?? !!pi.paymentInstapay;
+  const curNumber   = document.getElementById('mgrInstapayNumInp')?.value ?? (pi.instapayNumber || '');
+
+  const collectorOptions = knownNames
+    .map(n => `<option value="${h(n)}" ${curCollector === n ? 'selected' : ''}>${h(n)}</option>`)
+    .join('');
+
+  section.innerHTML = `
+    <div class="mgr-config-card" style="margin:0 14px 0;">
+      <div class="cfg-row">
+        <span class="cfg-label">المسؤول عن تحصيل الفلوس</span>
+        <div class="sel-wrap">
+          <select id="mgrCollectorSel" onchange="onMgrCollectorChange()">
+            <option value="">-- اختار --</option>
+            ${collectorOptions}
+            <option value="__other__" ${curCollector === '__other__' ? 'selected' : ''}>➕ شخص آخر</option>
+          </select>
+        </div>
+        <div id="mgrCollectorOtherWrap" style="${curCollector === '__other__' ? '' : 'display:none;'}margin-top:8px;">
+          <input id="mgrCollectorOtherName" type="text" class="cfg-text-input"
+            placeholder="اسم المسؤول" maxlength="30" value="${h(curOtherName)}">
+        </div>
+      </div>
+
+      <div class="cfg-row">
+        <span class="cfg-label">طريقة الدفع</span>
+        <div class="cfg-check-row">
+          <label class="cfg-check-label"><input type="checkbox" id="mgrPayCash" ${curCash ? 'checked' : ''}
+            onchange="document.getElementById('mgrInstapayRow') && null"> كاش</label>
+          <label class="cfg-check-label"><input type="checkbox" id="mgrPayInstapay" ${curInstapay ? 'checked' : ''}
+            onchange="document.getElementById('mgrInstapayRow').style.display=this.checked?'':'none'"> إنستاباي</label>
+        </div>
+      </div>
+
+      <div class="cfg-row" id="mgrInstapayRow" ${curInstapay ? '' : 'style="display:none"'}>
+        <span class="cfg-label">لينك الإنستاباي</span>
+        <input id="mgrInstapayNumInp" type="url" placeholder="https://ipn.eg/S/..." maxlength="120"
+          class="cfg-text-input" style="direction:ltr;text-align:left;font-size:13px;" value="${h(curNumber)}">
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:4px;" data-action="doMgrSavePayment">
+        💾 حفظ إعدادات الدفع
+      </button>
+    </div>`;
+}
+
+async function doMgrSavePayment() {
+  const sel         = document.getElementById('mgrCollectorSel');
+  const selVal      = sel ? sel.value : '';
+  const isOther     = selVal === '__other__';
+  const collectorName = isOther
+    ? (document.getElementById('mgrCollectorOtherName')?.value.trim() || '')
+    : selVal;
+  const paymentCash     = document.getElementById('mgrPayCash')?.checked     || false;
+  const paymentInstapay = document.getElementById('mgrPayInstapay')?.checked || false;
+  const instapayNumber  = document.getElementById('mgrInstapayNumInp')?.value.trim() || '';
+
+  if (!selVal)                            { showToast('اختار المسؤول عن التحصيل'); return; }
+  if (isOther && !collectorName)          { showToast('اكتب اسم المسؤول');         return; }
+  if (!paymentCash && !paymentInstapay)   { showToast('اختار طريقة دفع');           return; }
+  if (paymentInstapay && !instapayNumber) { showToast('ادخل لينك الإنستاباي');      return; }
+
+  const btn = document.querySelector('[data-action="doMgrSavePayment"]');
+  if (btn) setBtnLoading(btn, 'جاري الحفظ');
+  try {
+    await api('setPaymentInfo', {
+      data: { collectorName, isKnownName: !isOther, paymentCash, paymentInstapay, instapayNumber },
+      ref:  S.mgrKey
+    });
+    S.paymentInfo = { collectorName, paymentCash, paymentInstapay, instapayNumber };
+    if (!isOther) {
+      const rec = (S.namesAdmin || []).find(n => n.name === collectorName);
+      if (rec && paymentInstapay) rec.instapay_number = instapayNumber;
+    }
+    showToast('تم حفظ إعدادات الدفع ✓');
+  } catch (e) {
+    showToast(e.message || 'فشل حفظ إعدادات الدفع ❌');
+  } finally {
+    const b = document.querySelector('[data-action="doMgrSavePayment"]');
+    if (b) resetBtn(b);
+  }
 }
 
 // ── Payment tracking (MANAGER ONLY) ───────────────────────────────────────
@@ -425,7 +545,7 @@ async function doToggleOrdering() {
   // Hard block: ordering cannot open without a money collector chosen — the
   // backend enforces this too, this is just the friendly message.
   if (newState && !(S.paymentInfo && S.paymentInfo.collectorName)) {
-    showToast('المسؤول عن التحصيل محددتوش — المدير الأساسي يحدده');
+    showToast('اختار المسؤول عن التحصيل وطريقة الدفع الأول');
     return;
   }
   const msg = newState
