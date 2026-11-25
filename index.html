@@ -225,6 +225,10 @@
   <div class="section-title">مطعم اليوم ورسوم التوصيل</div>
   <div id="mgrConfigSection"></div>
 
+  <!-- Collector / payment (rendered by manager.js _renderMgrCollector) -->
+  <div class="section-title">المسؤول عن التحصيل وطريقة الدفع</div>
+  <div id="mgrCollectorSection"></div>
+
   <div class="refresh-row">
     <span class="last-updated" id="lastUpdated"></span>
     <button class="refresh-btn" data-action="refreshManager">🔄 تحديث</button>
@@ -289,9 +293,7 @@
   </div>
   <!-- Content rendered dynamically by renderSuperMgrDashboard() -->
   <div id="superMgrContent" style="padding-bottom:40px;"></div>
-  <!-- Collector/payment and schedule sections rendered by supermanager.js -->
-  <div class="section-title" id="smCollectorTitle" style="display:none;">المسؤول عن التحصيل وطريقة الدفع</div>
-  <div id="smCollectorSection"></div>
+  <!-- Schedule section rendered by supermanager.js -->
   <div class="section-title" id="smScheduleTitle" style="display:none;">المواعيد التلقائية</div>
   <div id="smScheduleSection"></div>
 </div>
